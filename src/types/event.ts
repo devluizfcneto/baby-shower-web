@@ -1,17 +1,24 @@
 export interface EventPublic {
-  id: string
-  eventCode: string
+  id: number
+  eventCode?: string
   name: string
   date: string
   venueAddress: string
-  deliveryAddress?: string
-  mapsLink?: string
-  coverImageUrl?: string
-  pixKeyDad?: string
-  pixKeyMom?: string
-  pixQrcodeDad?: string
-  pixQrcodeMom?: string
-  isArchived: boolean
+  deliveryAddress: string | null
+  mapsLink: string | null
+  coverImageUrl: string | null
+  pix: {
+    dadKey: string | null
+    momKey: string | null
+    dadQrCode: string | null
+    momQrCode: string | null
+  }
+  isArchived?: boolean
+}
+
+export interface ApiEnvelope<T> {
+  data: T
+  meta?: Record<string, unknown>
 }
 
 export interface EventSummary {
