@@ -53,6 +53,40 @@ npm install
 npm run dev
 ```
 
+## ⚙️ Environment Setup (Routes + API)
+
+1. Create your local env file from the example:
+
+```bash
+cp .env.example .env.local
+```
+
+2. Configure values:
+
+- `VITE_APP_BASE_PATH`: base path for the SPA router (example: `/` or `/baby-shower/`)
+- `VITE_API_BASE_URL`: REST API host (example: `https://api.example.com`)
+- `VITE_API_PREFIX`: API prefix used by the app (example: `/api` or `/v1`)
+- `VITE_API_PROXY_TARGET` (optional): dev proxy target to avoid CORS during local development
+
+When `VITE_API_PROXY_TARGET` is defined, Vite proxies local `/api/*` requests to your backend target.
+
+## 🌐 REST Consumption Pattern
+
+Use the centralized HTTP helper:
+
+- URL builder: `src/services/http.ts` -> `buildApiUrl(path)`
+- Request helper: `src/services/http.ts` -> `apiFetch<T>(path, init)`
+
+Example:
+
+```ts
+import { apiFetch } from '@/services/http'
+
+type Guest = { id: string; name: string }
+
+const guests = await apiFetch<Guest[]>('/guests')
+```
+
 ## 🏗️ Build
 
 ```bash
