@@ -1,6 +1,7 @@
 import type { Gift } from '@/types/gift'
 import { defineStore } from 'pinia'
 import { listPublicGifts } from '@/api/giftApi'
+import { ApiError } from '@/services/http'
 
 interface GiftState {
   items: Gift[]
@@ -20,12 +21,47 @@ export const useGiftStore = defineStore('gift', {
       this.errorMessage = null
 
       try {
-        this.items = await listPublicGifts(eventCode)
+        const gifts = await listPublicGifts(eventCode)
+
+        this.items = gifts.reduce<Gift[]>((ordered, gift) => {
+          const insertAt = ordered.findIndex(item => item.sortOrder > gift.sortOrder)
+
+          if (insertAt === -1) {
+            ordered.push(gift)
+          } else {
+            ordered.splice(insertAt, 0, gift)
+          }
+
+          return ordered
+        }, [])
       } catch (error) {
-        this.errorMessage = error instanceof Error ? error.message : 'Falha ao carregar presentes'
+        if (error instanceof ApiError) {
+          if (error.status === 404) {
+            this.errorMessage = 'Evento nao encontrado.'
+          } else if (error.status === 410) {
+            this.errorMessage = 'Este evento foi encerrado.'
+          } else {
+            this.errorMessage = 'Nao foi possivel carregar os presentes.'
+          }
+        } else {
+          this.errorMessage = 'Nao foi possivel carregar os presentes.'
+        }
       } finally {
         this.isLoading = false
       }
+    },
+    applyPurchaseConfirmation (giftId: string, quantity: number) {
+      const normalizedQuantity = Math.max(1, quantity)
+      const targetGift = this.items.find(gift => gift.id === giftId)
+
+      if (!targetGift) {
+        return
+      }
+
+      targetGift.confirmedQuantity = Math.min(
+        targetGift.maxQuantity,
+        targetGift.confirmedQuantity + normalizedQuantity,
+      )
     },
     clearGifts () {
       this.items = []

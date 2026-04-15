@@ -77,21 +77,14 @@
         </v-sheet>
 
         <v-row class="mt-4 mt-md-6" dense>
-          <v-col cols="12" md="4">
-            <v-sheet class="info-card pa-4 pa-md-5" rounded="xl">
-              <p class="info-card__label">Codigo do evento</p>
-              <p class="info-card__value">{{ eventCode }}</p>
-            </v-sheet>
-          </v-col>
-
-          <v-col cols="12" md="4">
+          <v-col cols="12" md="6">
             <v-sheet class="info-card pa-4 pa-md-5" rounded="xl">
               <p class="info-card__label">Data e horario</p>
               <p class="info-card__value">{{ eventDateLabel }}</p>
             </v-sheet>
           </v-col>
 
-          <v-col cols="12" md="4">
+          <v-col cols="12" md="6">
             <v-sheet class="info-card pa-4 pa-md-5" rounded="xl">
               <p class="info-card__label">Local</p>
               <p class="info-card__value">{{ venueAddress || 'Em breve' }}</p>

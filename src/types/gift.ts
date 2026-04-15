@@ -1,9 +1,9 @@
 export interface Gift {
   id: string
-  eventId: string
+  eventId?: string
   name: string
-  description?: string
-  imageUrl?: string
+  description?: string | null
+  imageUrl?: string | null
   marketplace: 'amazon' | 'mercadolivre' | 'shopee'
   marketplaceUrl: string
   maxQuantity: number
@@ -16,6 +16,5 @@ export interface GiftPurchaseConfirmationPayload {
   guestName: string
   guestEmail: string
   quantity?: number
-  orderNumber?: string
   notes?: string
 }

@@ -9,6 +9,8 @@ interface EventState {
   errorMessage: string | null
 }
 
+const EVENT_CACHE_TTL_MS = 30 * 60 * 1000
+
 function isValidEventPublicCache (value: unknown): value is EventPublic {
   if (typeof value !== 'object' || value === null) {
     return false
@@ -24,6 +26,19 @@ function isValidEventPublicCache (value: unknown): value is EventPublic {
 }
 
 function getEventCache (eventCode: string): EventPublic | null {
+  const cachedAtRaw = localStorage.getItem(getEventCacheTimestampKey(eventCode))
+
+  if (!cachedAtRaw) {
+    removeEventCache(eventCode)
+    return null
+  }
+
+  const cachedAt = Number(cachedAtRaw)
+  if (Number.isNaN(cachedAt) || Date.now() - cachedAt > EVENT_CACHE_TTL_MS) {
+    removeEventCache(eventCode)
+    return null
+  }
+
   const cached = localStorage.getItem(eventCode)
   if (!cached) {
     return null
@@ -44,12 +59,18 @@ function getEventCache (eventCode: string): EventPublic | null {
   }
 }
 
+function getEventCacheTimestampKey (eventCode: string): string {
+  return `${eventCode}:cachedAt`
+}
+
 function setEventCache (eventCode: string, event: EventPublic): void {
   localStorage.setItem(eventCode, JSON.stringify(event))
+  localStorage.setItem(getEventCacheTimestampKey(eventCode), String(Date.now()))
 }
 
 function removeEventCache (eventCode: string): void {
   localStorage.removeItem(eventCode)
+  localStorage.removeItem(getEventCacheTimestampKey(eventCode))
 }
 
 export const useEventStore = defineStore('event', {
