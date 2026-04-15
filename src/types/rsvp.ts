@@ -1,9 +1,10 @@
-export interface RSVPCompanion {
+export interface RSVPCompanionPayload {
   fullName: string
+  email: string
 }
 
 export interface RSVPCreatePayload {
   fullName: string
   email: string
-  companions?: RSVPCompanion[]
+  companions?: RSVPCompanionPayload[]
 }
