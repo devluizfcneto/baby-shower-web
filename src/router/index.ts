@@ -66,7 +66,7 @@ const router = createRouter({
       meta: { requiresAdmin: true },
     },
     {
-      path: '/admin/eventos/:event_id/dashboard',
+      path: '/admin/eventos/:event_id',
       name: 'admin-dashboard',
       component: Dashboard,
       meta: { requiresAdmin: true },

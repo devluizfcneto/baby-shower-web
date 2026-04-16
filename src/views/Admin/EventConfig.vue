@@ -1,6 +1,6 @@
 <template>
   <section class="event-config">
-    <v-container class="py-8 py-md-12" max-width="1100">
+    <v-container class="py-8 py-md-12" max-width="1440">
       <v-sheet class="config__hero pa-5 pa-md-7 mb-5" rounded="xl">
         <div class="d-flex flex-wrap align-center justify-space-between ga-3">
           <div>
@@ -14,8 +14,7 @@
             prepend-icon="mdi-arrow-left"
             rounded="pill"
             variant="tonal"
-            @click="router.push(`/admin/eventos/${eventId}/dashboard`)
-            "
+            @click="router.push(`/admin/eventos/${eventId}`)"
           >
             Voltar ao dashboard
           </v-btn>

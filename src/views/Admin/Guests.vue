@@ -1,5 +1,5 @@
 <template>
-  <v-container class="py-10" max-width="1200">
+  <v-container class="py-10" max-width="1440">
     <!-- Header -->
     <div class="d-flex align-center justify-space-between mb-6">
       <div>
@@ -19,25 +19,30 @@
 
     <!-- Search & Filters -->
     <v-card class="pa-4 mb-6" rounded="lg">
-      <div class="d-flex gap-3 flex-wrap">
-        <v-text-field
-          v-model="searchQuery"
-          class="flex-grow-1"
-          clearable
-          density="compact"
-          label="Buscar por nome ou e-mail"
-          prepend-inner-icon="mdi-magnify"
-          style="max-width: 300px"
-        />
-        <v-btn
-          class="align-self-center"
-          :disabled="!searchQuery"
-          variant="tonal"
-          @click="searchQuery = ''"
-        >
-          Limpar
-        </v-btn>
-      </div>
+      <v-row class="align-center" dense>
+        <v-col class="d-flex" cols="12" lg="9" md="8">
+          <v-text-field
+            v-model="searchQuery"
+            class="flex-grow-1"
+            clearable
+            density="comfortable"
+            label="Buscar por nome ou e-mail"
+            prepend-inner-icon="mdi-magnify"
+            variant="outlined"
+          />
+        </v-col>
+        <v-col class="d-flex" cols="12" lg="3" md="4">
+          <v-btn
+            block
+            :disabled="!searchQuery"
+            height="56"
+            variant="tonal"
+            @click="searchQuery = ''"
+          >
+            Limpar
+          </v-btn>
+        </v-col>
+      </v-row>
     </v-card>
 
     <!-- Loading State -->
@@ -53,26 +58,21 @@
       <v-table v-if="filteredGuests.length > 0" class="text-sm">
         <thead>
           <tr class="bg-grey-100">
+            <th class="text-center pa-4">#</th>
             <th class="text-left pa-4">Nome</th>
             <th class="text-left pa-4">E-mail</th>
-            <th class="text-center pa-4">Acompanhantes</th>
+            <th class="text-left pa-4">Acompanhante</th>
             <th class="text-center pa-4">Total de Pessoas</th>
             <th class="text-left pa-4">Data de Confirmação</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="guest in filteredGuests" :key="guest.id" class="border-b">
+          <tr v-for="guest in numberedGuests" :key="guest.id" class="border-b">
+            <td class="text-center pa-4 font-weight-bold">{{ guest.position }}</td>
             <td class="pa-4 font-weight-500">{{ guest.fullName }}</td>
             <td class="pa-4">{{ guest.email }}</td>
-            <td class="text-center pa-4">
-              <v-chip
-                v-if="guest.companions.length > 0"
-                color="info"
-                size="small"
-                variant="tonal"
-              >
-                {{ guest.companions.length }}
-              </v-chip>
+            <td class="pa-4">
+              <span v-if="guest.companionName">{{ guest.companionName }}</span>
               <span v-else class="text-grey-600">—</span>
             </td>
             <td class="text-center pa-4 font-weight-500">
@@ -96,44 +96,58 @@
     </v-card>
 
     <!-- Summary Stats -->
-    <v-card v-if="guests.length > 0 && !isLoading" class="mt-6 pa-6" color="blue-50" rounded="lg">
-      <div class="d-flex gap-6 flex-wrap">
-        <div>
-          <p class="text-grey-700 text-sm">Total de Convidados</p>
-          <p class="text-h6 font-weight-bold">{{ guests.length }}</p>
+    <v-card v-if="guests.length > 0 && !isLoading" class="mt-6 pa-5 guests-summary" rounded="lg">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <p class="summary-item__label">Total de Convidados</p>
+          <p class="summary-item__value">{{ guestsSummary.guests }}</p>
         </div>
-        <div>
-          <p class="text-grey-700 text-sm">Total de Pessoas (com acompanhantes)</p>
-          <p class="text-h6 font-weight-bold">{{ totalPeople }}</p>
+        <div class="summary-item">
+          <p class="summary-item__label">Total de Acompanhantes</p>
+          <p class="summary-item__value">{{ guestsSummary.companions }}</p>
         </div>
-        <div>
-          <p class="text-grey-700 text-sm">Taxa de Confirmação</p>
-          <p class="text-h6 font-weight-bold">100%</p>
+        <div class="summary-item">
+          <p class="summary-item__label">Total de Pessoas</p>
+          <p class="summary-item__value">{{ guestsSummary.totalPeople }}</p>
         </div>
       </div>
     </v-card>
+
+    <v-snackbar
+      v-model="toast.visible"
+      :color="toast.color"
+      :location="toastLocation"
+      :timeout="2000"
+    >
+      {{ toast.message }}
+    </v-snackbar>
   </v-container>
 </template>
 
 <script setup lang="ts">
   import type { ApiError } from '@/services/http'
-  import type { AdminGuest } from '@/types/admin'
+  import type { AdminGuest, AdminGuestsSummary } from '@/types/admin'
   import { computed, onMounted, ref } from 'vue'
   import { useRoute } from 'vue-router'
-  import { exportAdminGuestsCsv, listAdminEventGuests } from '@/api/adminApi'
+  import { listAdminEventGuests } from '@/api/adminApi'
   import { useAppToast } from '@/composables/useAppToast'
 
   const route = useRoute()
-  const { showToast } = useAppToast()
+  const { toast, toastLocation, showToast } = useAppToast()
 
   const guests = ref<AdminGuest[]>([])
+  const guestsSummary = ref<AdminGuestsSummary>({
+    guests: 0,
+    companions: 0,
+    totalPeople: 0,
+  })
   const searchQuery = ref('')
   const isLoading = ref(false)
   const isExporting = ref(false)
 
   const eventId = computed(() => route.params.event_id as string)
 
-  const filteredGuests = computed(() => {
+  const filteredGuests = computed<AdminGuest[]>(() => {
     if (!searchQuery.value) return guests.value
 
     const query = searchQuery.value.toLowerCase()
@@ -144,9 +158,17 @@
     )
   })
 
-  const totalPeople = computed(() =>
-    guests.value.reduce((sum, g) => sum + g.totalPeople, 0),
+  const numberedGuests = computed(() =>
+    filteredGuests.value.map((guest, index) => ({
+      ...guest,
+      position: index + 1,
+    })),
   )
+
+  function escapeCsvValue (value: string | number): string {
+    const normalized = String(value).replaceAll('"', '""')
+    return `"${normalized}"`
+  }
 
   function formatDate (dateString: string): string {
     try {
@@ -166,7 +188,9 @@
   async function loadGuests () {
     isLoading.value = true
     try {
-      guests.value = await listAdminEventGuests(eventId.value)
+      const response = await listAdminEventGuests(eventId.value)
+      guests.value = response.data
+      guestsSummary.value = response.summary
     } catch (error) {
       const apiError = error as ApiError
       const message
@@ -182,7 +206,20 @@
   async function downloadCsv () {
     isExporting.value = true
     try {
-      const blob = await exportAdminGuestsCsv(eventId.value)
+      const header = ['#', 'Nome', 'E-mail', 'Acompanhante', 'Total de Pessoas', 'Confirmado em']
+      const lines = numberedGuests.value.map(guest => {
+        return [
+          guest.position,
+          guest.fullName,
+          guest.email,
+          guest.companionName || '',
+          guest.totalPeople,
+          formatDate(guest.confirmedAt),
+        ].map(value => escapeCsvValue(value)).join(',')
+      })
+
+      const csv = [header.map(value => escapeCsvValue(value)).join(','), ...lines].join('\n')
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -231,5 +268,37 @@
   font-family: 'Cormorant Garamond', serif;
   font-size: 2.5rem;
   font-weight: 500;
+}
+
+.guests-summary {
+  border: 1px solid rgba(16, 64, 126, 0.14);
+  background: linear-gradient(145deg, #f8fbff, #eaf3ff 56%, #e1ecff);
+}
+
+.summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.summary-item {
+  padding: 12px 14px;
+  border: 1px solid rgba(16, 64, 126, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.summary-item__label {
+  margin: 0;
+  color: #4d5e7c;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.summary-item__value {
+  margin: 4px 0 0;
+  color: #14213a;
+  font-size: 1.55rem;
+  font-weight: 700;
 }
 </style>

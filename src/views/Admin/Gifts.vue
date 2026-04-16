@@ -1,6 +1,6 @@
 <template>
   <section class="admin-gifts">
-    <v-container class="py-8 py-md-12" max-width="1160">
+    <v-container class="py-8 py-md-12" max-width="1440">
       <v-sheet class="gifts__hero pa-5 pa-md-7 mb-5" rounded="xl">
         <div class="d-flex flex-wrap align-center justify-space-between ga-3">
           <div>
@@ -178,18 +178,29 @@
                   </td>
                   <td class="text-right">
                     <div class="d-flex justify-end ga-1 flex-wrap">
-                      <v-btn size="x-small" variant="tonal" @click="editGift(gift)">Editar</v-btn>
+                      <v-btn
+                        icon="mdi-pencil-outline"
+                        size="small"
+                        :title="'Editar presente'"
+                        variant="tonal"
+                        @click="editGift(gift)"
+                      />
                       <v-btn
                         :color="gift.isBlocked ? 'success' : 'warning'"
-                        size="x-small"
+                        :icon="gift.isBlocked ? 'mdi-lock-open-variant-outline' : 'mdi-lock-outline'"
+                        size="small"
+                        :title="gift.isBlocked ? 'Desbloquear presente' : 'Bloquear presente'"
                         variant="text"
                         @click="toggleBlock(gift)"
-                      >
-                        {{ gift.isBlocked ? 'Desbloquear' : 'Bloquear' }}
-                      </v-btn>
-                      <v-btn color="error" size="x-small" variant="text" @click="removeGift(gift.id)">
-                        Excluir
-                      </v-btn>
+                      />
+                      <v-btn
+                        color="error"
+                        icon="mdi-trash-can-outline"
+                        size="small"
+                        :title="'Excluir presente'"
+                        variant="text"
+                        @click="removeGift(gift.id)"
+                      />
                     </div>
                   </td>
                 </tr>
@@ -416,7 +427,7 @@
 
   function goBack (): void {
     const query = eventCode.value ? { event_code: eventCode.value } : undefined
-    router.push({ path: `/admin/eventos/${eventId.value}/dashboard`, query })
+    router.push({ path: `/admin/eventos/${eventId.value}`, query })
   }
 
   function handleApiError (error: unknown, fallbackMessage: string): void {

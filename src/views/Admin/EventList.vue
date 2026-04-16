@@ -1,6 +1,6 @@
 <template>
   <section class="admin-events">
-    <v-container class="py-8 py-md-12" max-width="1160">
+    <v-container class="py-8 py-md-12" max-width="1440">
       <v-sheet class="admin-events__hero pa-5 pa-md-7 mb-5" rounded="xl">
         <div class="d-flex flex-wrap align-center justify-space-between ga-3">
           <div>
@@ -545,7 +545,7 @@
 
       setTimeout(() => {
         router.push({
-          path: `/admin/eventos/${createdEvent.id}/dashboard`,
+          path: `/admin/eventos/${createdEvent.id}`,
           query: { event_code: createdEvent.eventCode },
         })
       }, 250)
@@ -571,7 +571,7 @@
   function openDashboard (eventId: string, eventCode: string): void {
     rememberEventMapping(eventId, eventCode)
     router.push({
-      path: `/admin/eventos/${eventId}/dashboard`,
+      path: `/admin/eventos/${eventId}`,
       query: { event_code: eventCode },
     })
   }

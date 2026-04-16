@@ -7,11 +7,14 @@ import type {
   AdminGift,
   AdminGiftInputPayload,
   AdminGuest,
+  AdminGuestsListResponse,
+  AdminGuestsSummary,
   AdminListEventsQuery,
   AdminLoginPayload,
   AdminLoginResponse,
   AdminPaginatedResponse,
   AdminPurchase,
+  AdminPurchaseSummary,
   AdminSignupPayload,
   AdminUpdateEventPayload,
 } from '@/types/admin'
@@ -75,16 +78,24 @@ function asBoolean (value: unknown, fallback = false): boolean {
 
 function normalizeEventSummary (input: unknown): AdminEventSummary {
   const raw = asRecord(input)
+  const counters = asRecord(raw.counters)
 
   return {
     id: String(raw.id || ''),
-    eventCode: asString(raw.eventCode ?? raw.event_code),
+    eventCode: asString(raw.eventCode ?? raw.event_code ?? raw.code),
     name: asString(raw.name),
     date: asString(raw.date),
     isArchived: asBoolean(raw.isArchived ?? raw.is_archived),
-    guestsCount: asNumber(raw.guestsCount ?? raw.guests_count, 0),
-    giftsCount: asNumber(raw.giftsCount ?? raw.gifts_count, 0),
-    donationsCount: asNumber(raw.donationsCount ?? raw.donations_count, 0),
+    guestsCount: asNumber(raw.guestsCount ?? raw.guests_count ?? counters.guests, 0),
+    giftsCount: asNumber(raw.giftsCount ?? raw.gifts_count ?? counters.gifts, 0),
+    purchasesCount: asNumber(
+      raw.purchasesCount
+      ?? raw.purchases_count
+      ?? counters.purchases
+      ?? counters.purchase_confirmations,
+      0,
+    ),
+    donationsCount: asNumber(raw.donationsCount ?? raw.donations_count ?? counters.donations, 0),
   }
 }
 
@@ -94,7 +105,7 @@ function normalizeEventDetails (input: unknown): AdminEventDetails {
 
   return {
     id: String(raw.id || ''),
-    eventCode: asString(raw.eventCode ?? raw.event_code),
+    eventCode: asString(raw.eventCode ?? raw.event_code ?? raw.code),
     name: asString(raw.name),
     date: asString(raw.date),
     venueAddress: asString(raw.venueAddress ?? raw.venue_address),
@@ -108,6 +119,7 @@ function normalizeEventDetails (input: unknown): AdminEventDetails {
     isArchived: asBoolean(raw.isArchived ?? raw.is_archived),
     guestsCount: asNumber(raw.guestsCount ?? raw.guests_count, 0),
     giftsCount: asNumber(raw.giftsCount ?? raw.gifts_count, 0),
+    purchasesCount: asNumber(raw.purchasesCount ?? raw.purchases_count, 0),
     donationsCount: asNumber(raw.donationsCount ?? raw.donations_count, 0),
   }
 }
@@ -179,12 +191,14 @@ function normalizeGuest (input: unknown): AdminGuest {
   const raw = asRecord(input)
   const companionsRaw = raw.companions
   const companions = Array.isArray(companionsRaw) ? companionsRaw.map(item => normalizeCompanion(item)) : []
+  const companionName = asNullableString(raw.companionName ?? raw.companion_name)
 
   return {
-    id: String(raw.id || ''),
+    id: String(raw.id ?? raw.guestId ?? raw.guest_id ?? ''),
     fullName: asString(raw.fullName ?? raw.full_name),
     email: asString(raw.email),
     confirmedAt: asString(raw.confirmedAt ?? raw.confirmed_at),
+    companionName: companionName ?? companions[0]?.fullName ?? null,
     companions,
     totalPeople: asNumber(raw.totalPeople ?? raw.total_people, companions.length + 1),
   }
@@ -194,8 +208,8 @@ function normalizePurchase (input: unknown): AdminPurchase {
   const raw = asRecord(input)
 
   return {
-    id: String(raw.id || ''),
-    giftId: asString(raw.giftId ?? raw.gift_id),
+    id: String(raw.id ?? raw.confirmationId ?? raw.confirmation_id ?? ''),
+    giftId: String(raw.giftId ?? raw.gift_id ?? ''),
     giftName: asString(raw.giftName ?? raw.gift_name),
     guestName: asString(raw.guestName ?? raw.guest_name),
     guestEmail: asString(raw.guestEmail ?? raw.guest_email),
@@ -203,6 +217,54 @@ function normalizePurchase (input: unknown): AdminPurchase {
     notes: asNullableString(raw.notes),
     orderNumber: asNullableString(raw.orderNumber ?? raw.order_number),
     confirmedAt: asString(raw.confirmedAt ?? raw.confirmed_at),
+  }
+}
+
+function normalizeGuestsSummary (payload: unknown, guests: AdminGuest[]): AdminGuestsSummary {
+  const root = asRecord(payload)
+  const unwrapped = asRecord(unwrapResponse<unknown>(payload))
+  const rootMeta = asRecord(root.meta)
+  const sourceMeta = asRecord(unwrapped.meta)
+  const rootSummary = asRecord(rootMeta.summary)
+  const sourceSummary = asRecord(sourceMeta.summary)
+
+  const guestsCount = asNumber(sourceSummary.guests ?? rootSummary.guests, guests.length)
+  const totalPeople = asNumber(
+    sourceSummary.totalPeople ?? sourceSummary.total_people ?? rootSummary.totalPeople ?? rootSummary.total_people,
+    guests.reduce((sum, item) => sum + item.totalPeople, 0),
+  )
+
+  return {
+    guests: guestsCount,
+    companions: asNumber(sourceSummary.companions ?? rootSummary.companions, Math.max(totalPeople - guestsCount, 0)),
+    totalPeople,
+  }
+}
+
+function normalizePurchaseSummary (payload: unknown): AdminPurchaseSummary {
+  const root = asRecord(payload)
+  const unwrapped = asRecord(unwrapResponse<unknown>(payload))
+  const rootMeta = asRecord(root.meta)
+  const sourceMeta = asRecord(unwrapped.meta)
+  const rootSummary = asRecord(rootMeta.summary)
+  const sourceSummary = asRecord(sourceMeta.summary)
+
+  return {
+    confirmations: asNumber(sourceSummary.confirmations ?? rootSummary.confirmations, 0),
+    unitsConfirmed: asNumber(
+      sourceSummary.unitsConfirmed
+      ?? sourceSummary.units_confirmed
+      ?? rootSummary.unitsConfirmed
+      ?? rootSummary.units_confirmed,
+      0,
+    ),
+    buyersUnique: asNumber(
+      sourceSummary.buyersUnique
+      ?? sourceSummary.buyers_unique
+      ?? rootSummary.buyersUnique
+      ?? rootSummary.buyers_unique,
+      0,
+    ),
   }
 }
 
@@ -224,13 +286,25 @@ function normalizeDonation (input: unknown): AdminDonation {
 function normalizePaginatedEvents (payload: unknown): AdminPaginatedResponse<AdminEventSummary> {
   const root = asRecord(payload)
   const source = asRecord(unwrapResponse<unknown>(payload))
+  const sourceMeta = asRecord(source.meta)
+  const rootMeta = asRecord(root.meta)
   const data = Array.isArray(source.data) ? source.data : (Array.isArray(root.data) ? root.data : [])
 
   return {
     data: data.map(item => normalizeEventSummary(item)),
-    page: asNumber(source.page ?? root.page, 1),
-    perPage: asNumber(source.perPage ?? source.per_page ?? root.perPage ?? root.per_page, 10),
-    total: asNumber(source.total ?? root.total, data.length),
+    page: asNumber(source.page ?? root.page ?? sourceMeta.page ?? rootMeta.page, 1),
+    perPage: asNumber(
+      source.perPage
+      ?? source.per_page
+      ?? root.perPage
+      ?? root.per_page
+      ?? sourceMeta.perPage
+      ?? sourceMeta.per_page
+      ?? rootMeta.perPage
+      ?? rootMeta.per_page,
+      10,
+    ),
+    total: asNumber(source.total ?? root.total ?? sourceMeta.total ?? rootMeta.total, data.length),
   }
 }
 
@@ -387,7 +461,7 @@ export function deleteAdminEventByCode (eventCode: string, eventName: string): P
 }
 
 export async function getAdminEventDashboard (eventId: string): Promise<AdminDashboardMetrics> {
-  const payload = await apiFetch<unknown>(`/admin/events/${eventId}/dashboard`)
+  const payload = await apiFetch<unknown>(`/admin/events/${eventId}`)
 
   return normalizeDashboard(payload)
 }
@@ -401,6 +475,14 @@ export async function listAdminEventGifts (eventId: string): Promise<AdminGift[]
   }
 
   return data.map(item => normalizeGift(item))
+}
+
+export async function countAdminEventGifts (eventId: string): Promise<number> {
+  const payload = await apiFetch<unknown>(`/admin/events/${eventId}/gifts`)
+  const root = asRecord(payload)
+  const unwrapped = asRecord(unwrapResponse<unknown>(payload))
+
+  return asNumber(unwrapped.meta?.total ?? root.meta?.total, 0)
 }
 
 export async function createAdminEventGift (eventId: string, payload: AdminGiftInputPayload): Promise<AdminGift> {
@@ -438,15 +520,38 @@ export function deleteAdminEventGift (eventId: string, giftId: string): Promise<
   })
 }
 
-export async function listAdminEventGuests (eventId: string): Promise<AdminGuest[]> {
+export async function listAdminEventGuests (eventId: string): Promise<AdminGuestsListResponse> {
   const payload = await apiFetch<unknown>(`/admin/events/${eventId}/guests`)
   const data = unwrapResponse<unknown>(payload)
 
   if (!Array.isArray(data)) {
-    return []
+    return {
+      data: [],
+      summary: {
+        guests: 0,
+        companions: 0,
+        totalPeople: 0,
+      },
+    }
   }
 
-  return data.map(item => normalizeGuest(item))
+  const guests = data.map(item => normalizeGuest(item))
+
+  return {
+    data: guests,
+    summary: normalizeGuestsSummary(payload, guests),
+  }
+}
+
+export async function getAdminEventPurchaseSummary (eventId: string): Promise<AdminPurchaseSummary> {
+  const payload = await apiFetch<unknown>(`/admin/events/${eventId}/purchase-confirmations`, {
+    params: {
+      page: 1,
+      perPage: 1,
+    },
+  })
+
+  return normalizePurchaseSummary(payload)
 }
 
 export async function listAdminEventPurchases (eventId: string): Promise<AdminPurchase[]> {

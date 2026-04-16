@@ -42,6 +42,7 @@ export interface AdminEventSummary {
   isArchived: boolean
   guestsCount: number
   giftsCount: number
+  purchasesCount: number
   donationsCount: number
 }
 
@@ -68,6 +69,7 @@ export interface AdminEventDetails {
   isArchived: boolean
   guestsCount: number
   giftsCount: number
+  purchasesCount: number
   donationsCount: number
 }
 
@@ -151,8 +153,20 @@ export interface AdminGuest {
   fullName: string
   email: string
   confirmedAt: string
+  companionName: string | null
   companions: AdminCompanion[]
   totalPeople: number
+}
+
+export interface AdminGuestsSummary {
+  guests: number
+  companions: number
+  totalPeople: number
+}
+
+export interface AdminGuestsListResponse {
+  data: AdminGuest[]
+  summary: AdminGuestsSummary
 }
 
 export interface AdminPurchase {
@@ -181,4 +195,10 @@ export interface AdminDashboardMetrics {
   giftsCount: number
   purchasesCount: number
   donationsCount: number
+}
+
+export interface AdminPurchaseSummary {
+  confirmations: number
+  unitsConfirmed: number
+  buyersUnique: number
 }
