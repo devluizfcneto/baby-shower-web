@@ -78,6 +78,31 @@ export interface AdminUpdateEventPayload {
   deliveryAddress?: string | null
   mapsLink?: string | null
   coverImageUrl?: string | null
+  pix?: {
+    dadKey?: string | null
+    momKey?: string | null
+    dadQrCode?: string | null
+    momQrCode?: string | null
+  }
+  pixKeyDad?: string | null
+  pixKeyMom?: string | null
+  pixQrcodeDad?: string | null
+  pixQrcodeMom?: string | null
+}
+
+export interface AdminCreateEventPayload {
+  name: string
+  date: string
+  venueAddress: string
+  deliveryAddress?: string | null
+  mapsLink?: string | null
+  coverImageUrl?: string | null
+  pix?: {
+    dadKey?: string | null
+    momKey?: string | null
+    dadQrCode?: string | null
+    momQrCode?: string | null
+  }
   pixKeyDad?: string | null
   pixKeyMom?: string | null
   pixQrcodeDad?: string | null

@@ -157,7 +157,7 @@
 <script setup lang="ts">
   import { computed, onMounted, reactive, ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
-  import { getAdminEventByCode, updateAdminEventByCode } from '@/api/adminApi'
+  import { getAdminEventById, updateAdminEventById } from '@/api/adminApi'
   import { useAppToast } from '@/composables/useAppToast'
   import { ApiError } from '@/services/http'
   import { useAdminAuthStore } from '@/stores/useAdminAuthStore'
@@ -185,17 +185,6 @@
   })
 
   const eventId = computed(() => String(route.params.event_id || ''))
-  const eventCode = computed(() => {
-    const routeCode = typeof route.query.event_code === 'string' ? route.query.event_code : ''
-
-    if (routeCode) {
-      localStorage.setItem(`admin:event-code:${eventId.value}`, routeCode)
-      return routeCode
-    }
-
-    return localStorage.getItem(`admin:event-code:${eventId.value}`) || ''
-  })
-
   const nameRules = [
     (value: string) => !!value.trim() || 'Informe o nome do evento',
     (value: string) => value.trim().length >= 3 || 'Nome deve ter ao menos 3 caracteres',
@@ -227,15 +216,15 @@
   }
 
   async function loadEvent (): Promise<void> {
-    if (!eventCode.value) {
-      showToast('Codigo do evento nao encontrado. Abra pelo painel de eventos.', 'error')
+    if (!eventId.value) {
+      showToast('Evento invalido.', 'error')
       return
     }
 
     isLoading.value = true
 
     try {
-      const eventItem = await getAdminEventByCode(eventCode.value)
+      const eventItem = await getAdminEventById(eventId.value)
 
       form.name = eventItem.name
       form.date = toDatetimeLocal(eventItem.date)
@@ -255,8 +244,8 @@
   }
 
   async function submit (): Promise<void> {
-    if (!eventCode.value) {
-      showToast('Codigo do evento invalido.', 'error')
+    if (!eventId.value) {
+      showToast('Evento invalido.', 'error')
       return
     }
 
@@ -268,17 +257,19 @@
     isSaving.value = true
 
     try {
-      await updateAdminEventByCode(eventCode.value, {
+      await updateAdminEventById(eventId.value, {
         name: form.name.trim(),
         date: fromDatetimeLocal(form.date),
         venueAddress: form.venueAddress.trim(),
         deliveryAddress: form.deliveryAddress.trim() || null,
         mapsLink: form.mapsLink.trim() || null,
         coverImageUrl: form.coverImageUrl.trim() || null,
-        pixKeyDad: form.pixKeyDad.trim() || null,
-        pixKeyMom: form.pixKeyMom.trim() || null,
-        pixQrcodeDad: form.pixQrcodeDad.trim() || null,
-        pixQrcodeMom: form.pixQrcodeMom.trim() || null,
+        pix: {
+          dadKey: form.pixKeyDad.trim() || null,
+          momKey: form.pixKeyMom.trim() || null,
+          dadQrCode: form.pixQrcodeDad.trim() || null,
+          momQrCode: form.pixQrcodeMom.trim() || null,
+        },
       })
 
       showToast('Configuracoes atualizadas com sucesso.', 'success')

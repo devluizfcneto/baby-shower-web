@@ -183,7 +183,7 @@
                         :color="gift.isBlocked ? 'success' : 'warning'"
                         size="x-small"
                         variant="text"
-                        @click="toggleBlock(gift.id)"
+                        @click="toggleBlock(gift)"
                       >
                         {{ gift.isBlocked ? 'Desbloquear' : 'Bloquear' }}
                       </v-btn>
@@ -379,9 +379,9 @@
     form.sortOrder = gift.sortOrder
   }
 
-  async function toggleBlock (giftId: string): Promise<void> {
+  async function toggleBlock (gift: AdminGift): Promise<void> {
     try {
-      await toggleAdminEventGiftBlock(eventId.value, giftId)
+      await toggleAdminEventGiftBlock(eventId.value, gift.id, !gift.isBlocked)
       showToast('Status do presente atualizado.', 'success')
       await loadGifts()
     } catch (error) {

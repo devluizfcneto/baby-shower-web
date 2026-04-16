@@ -1,4 +1,5 @@
 import type {
+  AdminCreateEventPayload,
   AdminDashboardMetrics,
   AdminDonation,
   AdminEventDetails,
@@ -89,6 +90,7 @@ function normalizeEventSummary (input: unknown): AdminEventSummary {
 
 function normalizeEventDetails (input: unknown): AdminEventDetails {
   const raw = asRecord(input)
+  const pix = asRecord(raw.pix)
 
   return {
     id: String(raw.id || ''),
@@ -99,14 +101,38 @@ function normalizeEventDetails (input: unknown): AdminEventDetails {
     deliveryAddress: asNullableString(raw.deliveryAddress ?? raw.delivery_address),
     mapsLink: asNullableString(raw.mapsLink ?? raw.maps_link),
     coverImageUrl: asNullableString(raw.coverImageUrl ?? raw.cover_image_url),
-    pixKeyDad: asNullableString(raw.pixKeyDad ?? raw.pix_key_dad),
-    pixKeyMom: asNullableString(raw.pixKeyMom ?? raw.pix_key_mom),
-    pixQrcodeDad: asNullableString(raw.pixQrcodeDad ?? raw.pix_qrcode_dad),
-    pixQrcodeMom: asNullableString(raw.pixQrcodeMom ?? raw.pix_qrcode_mom),
+    pixKeyDad: asNullableString(raw.pixKeyDad ?? raw.pix_key_dad ?? pix.dadKey ?? pix.dad_key),
+    pixKeyMom: asNullableString(raw.pixKeyMom ?? raw.pix_key_mom ?? pix.momKey ?? pix.mom_key),
+    pixQrcodeDad: asNullableString(raw.pixQrcodeDad ?? raw.pix_qrcode_dad ?? pix.dadQrCode ?? pix.dad_qr_code),
+    pixQrcodeMom: asNullableString(raw.pixQrcodeMom ?? raw.pix_qrcode_mom ?? pix.momQrCode ?? pix.mom_qr_code),
     isArchived: asBoolean(raw.isArchived ?? raw.is_archived),
     guestsCount: asNumber(raw.guestsCount ?? raw.guests_count, 0),
     giftsCount: asNumber(raw.giftsCount ?? raw.gifts_count, 0),
     donationsCount: asNumber(raw.donationsCount ?? raw.donations_count, 0),
+  }
+}
+
+function mapEventWritePayload (payload: AdminCreateEventPayload | AdminUpdateEventPayload): UnknownRecord {
+  const pix = payload.pix ?? {
+    dadKey: payload.pixKeyDad,
+    momKey: payload.pixKeyMom,
+    dadQrCode: payload.pixQrcodeDad,
+    momQrCode: payload.pixQrcodeMom,
+  }
+
+  return {
+    name: payload.name,
+    date: payload.date,
+    venueAddress: payload.venueAddress,
+    deliveryAddress: payload.deliveryAddress,
+    mapsLink: payload.mapsLink,
+    coverImageUrl: payload.coverImageUrl,
+    pix: {
+      dadKey: pix.dadKey,
+      momKey: pix.momKey,
+      dadQrCode: pix.dadQrCode,
+      momQrCode: pix.momQrCode,
+    },
   }
 }
 
@@ -294,11 +320,26 @@ export async function listAdminEvents (query: AdminListEventsQuery = {}): Promis
       status: query.status,
       search: query.search,
       page: query.page,
-      per_page: query.perPage,
+      perPage: query.perPage,
     },
   })
 
   return normalizePaginatedEvents(payload)
+}
+
+export async function createAdminEvent (payload: AdminCreateEventPayload): Promise<AdminEventDetails> {
+  const response = await apiFetch<unknown>('/admin/events', {
+    method: 'POST',
+    data: mapEventWritePayload(payload),
+  })
+
+  return normalizeEventDetails(unwrapResponse(response))
+}
+
+export async function getAdminEventById (eventId: string): Promise<AdminEventDetails> {
+  const payload = await apiFetch<unknown>(`/admin/events/${eventId}`)
+
+  return normalizeEventDetails(unwrapResponse(payload))
 }
 
 export async function getAdminEventByCode (eventCode: string): Promise<AdminEventDetails> {
@@ -313,7 +354,19 @@ export async function updateAdminEventByCode (
 ): Promise<AdminEventDetails> {
   const response = await apiFetch<unknown>(`/admin/events/by-code/${eventCode}`, {
     method: 'PATCH',
-    data: payload,
+    data: mapEventWritePayload(payload),
+  })
+
+  return normalizeEventDetails(unwrapResponse(response))
+}
+
+export async function updateAdminEventById (
+  eventId: string,
+  payload: AdminUpdateEventPayload,
+): Promise<AdminEventDetails> {
+  const response = await apiFetch<unknown>(`/admin/events/${eventId}`, {
+    method: 'PUT',
+    data: mapEventWritePayload(payload),
   })
 
   return normalizeEventDetails(unwrapResponse(response))
@@ -329,7 +382,7 @@ export function archiveAdminEventByCode (eventCode: string, isArchived: boolean)
 export function deleteAdminEventByCode (eventCode: string, eventName: string): Promise<void> {
   return apiFetch<void>(`/admin/events/by-code/${eventCode}`, {
     method: 'DELETE',
-    data: { eventName },
+    data: { confirmationName: eventName },
   })
 }
 
@@ -372,9 +425,10 @@ export async function updateAdminEventGift (
   return normalizeGift(unwrapResponse(response))
 }
 
-export function toggleAdminEventGiftBlock (eventId: string, giftId: string): Promise<void> {
+export function toggleAdminEventGiftBlock (eventId: string, giftId: string, isBlocked: boolean): Promise<void> {
   return apiFetch<void>(`/admin/events/${eventId}/gifts/${giftId}/block`, {
     method: 'PUT',
+    data: { isBlocked },
   })
 }
 
@@ -396,7 +450,14 @@ export async function listAdminEventGuests (eventId: string): Promise<AdminGuest
 }
 
 export async function listAdminEventPurchases (eventId: string): Promise<AdminPurchase[]> {
-  const payload = await apiFetch<unknown>(`/admin/events/${eventId}/purchases`)
+  let payload: unknown
+
+  try {
+    payload = await apiFetch<unknown>(`/admin/events/${eventId}/purchase-confirmations`)
+  } catch {
+    payload = await apiFetch<unknown>(`/admin/events/${eventId}/purchases`)
+  }
+
   const data = unwrapResponse<unknown>(payload)
 
   if (!Array.isArray(data)) {

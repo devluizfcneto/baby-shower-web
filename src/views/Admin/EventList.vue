@@ -12,6 +12,14 @@
           <div class="d-flex flex-wrap ga-2">
             <v-chip color="primary" variant="tonal">{{ totalEventsLabel }}</v-chip>
             <v-btn
+              color="primary"
+              prepend-icon="mdi-plus"
+              rounded="pill"
+              @click="openCreateDialog"
+            >
+              Novo evento
+            </v-btn>
+            <v-btn
               color="error"
               prepend-icon="mdi-logout"
               rounded="pill"
@@ -220,6 +228,123 @@
         </v-card>
       </v-dialog>
 
+      <v-dialog v-model="createDialog.visible" max-width="760">
+        <v-card rounded="xl">
+          <v-card-title class="text-h6">Criar novo evento</v-card-title>
+          <v-card-text>
+            <v-form ref="createFormRef" @submit.prevent="submitCreateEvent">
+              <v-row dense>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model="createDialog.name"
+                    density="comfortable"
+                    label="Nome do evento"
+                    :rules="createNameRules"
+                    variant="outlined"
+                  />
+                </v-col>
+
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model="createDialog.date"
+                    density="comfortable"
+                    label="Data e horario"
+                    :rules="createDateRules"
+                    type="datetime-local"
+                    variant="outlined"
+                  />
+                </v-col>
+              </v-row>
+
+              <v-text-field
+                v-model="createDialog.venueAddress"
+                density="comfortable"
+                label="Endereco do evento"
+                :rules="createVenueRules"
+                variant="outlined"
+              />
+
+              <v-text-field
+                v-model="createDialog.deliveryAddress"
+                density="comfortable"
+                label="Endereco para entrega de presentes"
+                variant="outlined"
+              />
+
+              <v-text-field
+                v-model="createDialog.mapsLink"
+                density="comfortable"
+                label="Link do Google Maps"
+                variant="outlined"
+              />
+
+              <v-text-field
+                v-model="createDialog.coverImageUrl"
+                density="comfortable"
+                label="URL da imagem de capa"
+                variant="outlined"
+              />
+
+              <v-row dense>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model="createDialog.pixKeyDad"
+                    density="comfortable"
+                    label="Chave Pix do papai"
+                    variant="outlined"
+                  />
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model="createDialog.pixKeyMom"
+                    density="comfortable"
+                    label="Chave Pix da mamae"
+                    variant="outlined"
+                  />
+                </v-col>
+              </v-row>
+
+              <v-row dense>
+                <v-col cols="12" md="6">
+                  <v-textarea
+                    v-model="createDialog.pixQrcodeDad"
+                    auto-grow
+                    density="comfortable"
+                    label="QR Code Pix do papai (base64)"
+                    rows="2"
+                    variant="outlined"
+                  />
+                </v-col>
+
+                <v-col cols="12" md="6">
+                  <v-textarea
+                    v-model="createDialog.pixQrcodeMom"
+                    auto-grow
+                    density="comfortable"
+                    label="QR Code Pix da mamae (base64)"
+                    rows="2"
+                    variant="outlined"
+                  />
+                </v-col>
+              </v-row>
+            </v-form>
+          </v-card-text>
+          <v-card-actions class="pb-4 px-4 d-flex ga-2">
+            <v-btn
+              color="primary"
+              :loading="isCreating"
+              rounded="pill"
+              @click="submitCreateEvent"
+            >
+              Criar evento
+            </v-btn>
+            <v-btn rounded="pill" variant="text" @click="closeCreateDialog">
+              Cancelar
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
       <v-snackbar
         v-model="toast.visible"
         :color="toast.color"
@@ -238,6 +363,7 @@
   import { useRouter } from 'vue-router'
   import {
     archiveAdminEventByCode,
+    createAdminEvent,
     deleteAdminEventByCode,
     listAdminEvents,
   } from '@/api/adminApi'
@@ -253,6 +379,8 @@
   const totalEvents = ref(0)
   const isLoading = ref(false)
   const isDeleting = ref(false)
+  const isCreating = ref(false)
+  const createFormRef = ref<{ validate: () => Promise<{ valid: boolean }> } | null>(null)
 
   const filters = reactive({
     search: '',
@@ -267,6 +395,20 @@
     confirmName: '',
   })
 
+  const createDialog = reactive({
+    visible: false,
+    name: '',
+    date: '',
+    venueAddress: '',
+    deliveryAddress: '',
+    mapsLink: '',
+    coverImageUrl: '',
+    pixKeyDad: '',
+    pixKeyMom: '',
+    pixQrcodeDad: '',
+    pixQrcodeMom: '',
+  })
+
   const statusItems = [
     { title: 'Todos', value: 'all' },
     { title: 'Ativos', value: 'active' },
@@ -274,6 +416,19 @@
   ]
 
   const perPageItems = [6, 12, 24]
+
+  const createNameRules = [
+    (value: string) => !!value.trim() || 'Informe o nome do evento',
+    (value: string) => value.trim().length >= 3 || 'Nome deve ter ao menos 3 caracteres',
+  ]
+
+  const createDateRules = [
+    (value: string) => !!value || 'Informe data e horario',
+  ]
+
+  const createVenueRules = [
+    (value: string) => !!value.trim() || 'Informe o endereco do evento',
+  ]
 
   const paginationLength = computed(() => {
     return Math.max(1, Math.ceil(totalEvents.value / filters.perPage))
@@ -302,6 +457,37 @@
     }).format(parsed)
   }
 
+  function fromDatetimeLocal (value: string): string {
+    if (!value) return ''
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+
+    return date.toISOString()
+  }
+
+  function resetCreateDialog (): void {
+    createDialog.name = ''
+    createDialog.date = ''
+    createDialog.venueAddress = ''
+    createDialog.deliveryAddress = ''
+    createDialog.mapsLink = ''
+    createDialog.coverImageUrl = ''
+    createDialog.pixKeyDad = ''
+    createDialog.pixKeyMom = ''
+    createDialog.pixQrcodeDad = ''
+    createDialog.pixQrcodeMom = ''
+  }
+
+  function openCreateDialog (): void {
+    createDialog.visible = true
+  }
+
+  function closeCreateDialog (): void {
+    createDialog.visible = false
+    resetCreateDialog()
+  }
+
   async function fetchEvents (): Promise<void> {
     isLoading.value = true
 
@@ -323,6 +509,50 @@
       handleApiError(error, 'Nao foi possivel carregar seus eventos.')
     } finally {
       isLoading.value = false
+    }
+  }
+
+  async function submitCreateEvent (): Promise<void> {
+    const validation = await createFormRef.value?.validate()
+
+    if (!validation?.valid) {
+      showToast('Revise os campos obrigatorios.', 'warning')
+      return
+    }
+
+    isCreating.value = true
+
+    try {
+      const createdEvent = await createAdminEvent({
+        name: createDialog.name.trim(),
+        date: fromDatetimeLocal(createDialog.date),
+        venueAddress: createDialog.venueAddress.trim(),
+        deliveryAddress: createDialog.deliveryAddress.trim() || null,
+        mapsLink: createDialog.mapsLink.trim() || null,
+        coverImageUrl: createDialog.coverImageUrl.trim() || null,
+        pix: {
+          dadKey: createDialog.pixKeyDad.trim() || null,
+          momKey: createDialog.pixKeyMom.trim() || null,
+          dadQrCode: createDialog.pixQrcodeDad.trim() || null,
+          momQrCode: createDialog.pixQrcodeMom.trim() || null,
+        },
+      })
+
+      rememberEventMapping(createdEvent.id, createdEvent.eventCode)
+      showToast('Evento criado com sucesso.', 'success')
+      closeCreateDialog()
+      await fetchEvents()
+
+      setTimeout(() => {
+        router.push({
+          path: `/admin/eventos/${createdEvent.id}/dashboard`,
+          query: { event_code: createdEvent.eventCode },
+        })
+      }, 250)
+    } catch (error) {
+      handleApiError(error, 'Nao foi possivel criar o evento.')
+    } finally {
+      isCreating.value = false
     }
   }
 
