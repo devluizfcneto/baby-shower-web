@@ -496,8 +496,10 @@ export async function countAdminEventGifts (eventId: string): Promise<number> {
   const payload = await apiFetch<unknown>(`/admin/events/${eventId}/gifts`)
   const root = asRecord(payload)
   const unwrapped = asRecord(unwrapResponse<unknown>(payload))
+  const unwrappedMeta = asRecord(unwrapped.meta)
+  const rootMeta = asRecord(root.meta)
 
-  return asNumber(unwrapped.meta?.total ?? root.meta?.total, 0)
+  return asNumber(unwrappedMeta.total ?? rootMeta.total, 0)
 }
 
 export async function createAdminEventGift (eventId: string, payload: AdminGiftInputPayload): Promise<AdminGift> {
@@ -532,7 +534,7 @@ export async function importAdminEventGifts (
     importedCount: toOptionalNumber(data.importedCount ?? data.imported_count),
     created: toOptionalNumber(data.created),
     count: toOptionalNumber(data.count),
-    message: asNullableString(data.message),
+    message: asNullableString(data.message) ?? undefined,
   }
 }
 
