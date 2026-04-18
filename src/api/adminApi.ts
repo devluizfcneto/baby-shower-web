@@ -5,6 +5,8 @@ import type {
   AdminEventDetails,
   AdminEventSummary,
   AdminGift,
+  AdminGiftImportPayload,
+  AdminGiftImportResult,
   AdminGiftInputPayload,
   AdminGuest,
   AdminGuestsListResponse,
@@ -110,12 +112,13 @@ function normalizeEventDetails (input: unknown): AdminEventDetails {
     date: asString(raw.date),
     venueAddress: asString(raw.venueAddress ?? raw.venue_address),
     deliveryAddress: asNullableString(raw.deliveryAddress ?? raw.delivery_address),
+    deliveryAddress2: asNullableString(raw.deliveryAddress2 ?? raw.delivery_address2),
+    deliveryAddress3: asNullableString(raw.deliveryAddress3 ?? raw.delivery_address3),
+    eventDetail: asNullableString(raw.eventDetail ?? raw.event_detail),
     mapsLink: asNullableString(raw.mapsLink ?? raw.maps_link),
     coverImageUrl: asNullableString(raw.coverImageUrl ?? raw.cover_image_url),
     pixKeyDad: asNullableString(raw.pixKeyDad ?? raw.pix_key_dad ?? pix.dadKey ?? pix.dad_key),
     pixKeyMom: asNullableString(raw.pixKeyMom ?? raw.pix_key_mom ?? pix.momKey ?? pix.mom_key),
-    pixQrcodeDad: asNullableString(raw.pixQrcodeDad ?? raw.pix_qrcode_dad ?? pix.dadQrCode ?? pix.dad_qr_code),
-    pixQrcodeMom: asNullableString(raw.pixQrcodeMom ?? raw.pix_qrcode_mom ?? pix.momQrCode ?? pix.mom_qr_code),
     isArchived: asBoolean(raw.isArchived ?? raw.is_archived),
     guestsCount: asNumber(raw.guestsCount ?? raw.guests_count, 0),
     giftsCount: asNumber(raw.giftsCount ?? raw.gifts_count, 0),
@@ -128,8 +131,6 @@ function mapEventWritePayload (payload: AdminCreateEventPayload | AdminUpdateEve
   const pix = payload.pix ?? {
     dadKey: payload.pixKeyDad,
     momKey: payload.pixKeyMom,
-    dadQrCode: payload.pixQrcodeDad,
-    momQrCode: payload.pixQrcodeMom,
   }
 
   return {
@@ -137,13 +138,14 @@ function mapEventWritePayload (payload: AdminCreateEventPayload | AdminUpdateEve
     date: payload.date,
     venueAddress: payload.venueAddress,
     deliveryAddress: payload.deliveryAddress,
+    deliveryAddress2: payload.deliveryAddress2,
+    deliveryAddress3: payload.deliveryAddress3,
     mapsLink: payload.mapsLink,
     coverImageUrl: payload.coverImageUrl,
+    eventDetail: payload.eventDetail,
     pix: {
       dadKey: pix.dadKey,
       momKey: pix.momKey,
-      dadQrCode: pix.dadQrCode,
-      momQrCode: pix.momQrCode,
     },
   }
 }
@@ -178,29 +180,40 @@ function normalizeGift (input: unknown): AdminGift {
   }
 }
 
-function normalizeCompanion (input: unknown) {
-  const raw = asRecord(input)
+function normalizeGuestRowType (raw: UnknownRecord): AdminGuest['rowType'] {
+  const candidate = asString(raw.rowType ?? raw.row_type ?? raw.recordType ?? raw.record_type ?? raw.type ?? raw.kind)
+    .trim()
+    .toLowerCase()
 
-  return {
-    id: String(raw.id || ''),
-    fullName: asString(raw.fullName ?? raw.full_name),
+  if (candidate === 'companion' || candidate === 'acompanhante') {
+    return 'companion'
   }
+
+  if (candidate === 'guest' || candidate === 'convidado') {
+    return 'guest'
+  }
+
+  if (raw.companionId || raw.companion_id || raw.parentGuestId || raw.parent_guest_id) {
+    return 'companion'
+  }
+
+  return 'guest'
 }
 
 function normalizeGuest (input: unknown): AdminGuest {
   const raw = asRecord(input)
-  const companionsRaw = raw.companions
-  const companions = Array.isArray(companionsRaw) ? companionsRaw.map(item => normalizeCompanion(item)) : []
-  const companionName = asNullableString(raw.companionName ?? raw.companion_name)
+  const rowType = normalizeGuestRowType(raw)
+  const normalizedGuestId = asString(raw.guestId ?? raw.guest_id ?? raw.parentGuestId ?? raw.parent_guest_id)
+  const fallbackId = String(raw.id ?? raw.rowId ?? raw.row_id ?? raw.guestId ?? raw.guest_id ?? raw.companionId ?? raw.companion_id ?? '')
+  const normalizedEmail = asNullableString(raw.email ?? raw.guestEmail ?? raw.guest_email ?? raw.companionEmail ?? raw.companion_email)
 
   return {
-    id: String(raw.id ?? raw.guestId ?? raw.guest_id ?? ''),
-    fullName: asString(raw.fullName ?? raw.full_name),
-    email: asString(raw.email),
-    confirmedAt: asString(raw.confirmedAt ?? raw.confirmed_at),
-    companionName: companionName ?? companions[0]?.fullName ?? null,
-    companions,
-    totalPeople: asNumber(raw.totalPeople ?? raw.total_people, companions.length + 1),
+    id: fallbackId,
+    guestId: normalizedGuestId || fallbackId,
+    rowType,
+    fullName: asString(raw.fullName ?? raw.full_name ?? raw.name),
+    email: normalizedEmail,
+    confirmedAt: asString(raw.confirmedAt ?? raw.confirmed_at ?? raw.guestConfirmedAt ?? raw.guest_confirmed_at),
   }
 }
 
@@ -228,15 +241,17 @@ function normalizeGuestsSummary (payload: unknown, guests: AdminGuest[]): AdminG
   const rootSummary = asRecord(rootMeta.summary)
   const sourceSummary = asRecord(sourceMeta.summary)
 
-  const guestsCount = asNumber(sourceSummary.guests ?? rootSummary.guests, guests.length)
+  const inferredGuests = guests.filter(item => item.rowType === 'guest').length
+  const inferredCompanions = guests.filter(item => item.rowType === 'companion').length
+  const guestsCount = asNumber(sourceSummary.guests ?? rootSummary.guests, inferredGuests)
   const totalPeople = asNumber(
     sourceSummary.totalPeople ?? sourceSummary.total_people ?? rootSummary.totalPeople ?? rootSummary.total_people,
-    guests.reduce((sum, item) => sum + item.totalPeople, 0),
+    guests.length,
   )
 
   return {
     guests: guestsCount,
-    companions: asNumber(sourceSummary.companions ?? rootSummary.companions, Math.max(totalPeople - guestsCount, 0)),
+    companions: asNumber(sourceSummary.companions ?? rootSummary.companions, inferredCompanions),
     totalPeople,
   }
 }
@@ -492,6 +507,33 @@ export async function createAdminEventGift (eventId: string, payload: AdminGiftI
   })
 
   return normalizeGift(unwrapResponse(response))
+}
+
+export async function importAdminEventGifts (
+  eventId: string,
+  payload: AdminGiftImportPayload,
+): Promise<AdminGiftImportResult> {
+  const response = await apiFetch<unknown>(`/admin/events/${eventId}/gifts/import`, {
+    method: 'POST',
+    data: payload,
+  })
+
+  const data = asRecord(unwrapResponse<unknown>(response))
+  const toOptionalNumber = (value: unknown): number | undefined => {
+    if (value === null || value === undefined || value === '') {
+      return undefined
+    }
+
+    return asNumber(value)
+  }
+
+  return {
+    imported: toOptionalNumber(data.imported),
+    importedCount: toOptionalNumber(data.importedCount ?? data.imported_count),
+    created: toOptionalNumber(data.created),
+    count: toOptionalNumber(data.count),
+    message: asNullableString(data.message),
+  }
 }
 
 export async function updateAdminEventGift (

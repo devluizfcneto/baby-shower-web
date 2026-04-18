@@ -60,12 +60,13 @@ export interface AdminEventDetails {
   date: string
   venueAddress: string
   deliveryAddress: string | null
+  deliveryAddress2: string | null
+  deliveryAddress3: string | null
+  eventDetail: string | null
   mapsLink: string | null
   coverImageUrl: string | null
   pixKeyDad: string | null
   pixKeyMom: string | null
-  pixQrcodeDad: string | null
-  pixQrcodeMom: string | null
   isArchived: boolean
   guestsCount: number
   giftsCount: number
@@ -78,18 +79,17 @@ export interface AdminUpdateEventPayload {
   date?: string
   venueAddress?: string
   deliveryAddress?: string | null
+  deliveryAddress2?: string | null
+  deliveryAddress3?: string | null
+  eventDetail?: string | null
   mapsLink?: string | null
   coverImageUrl?: string | null
   pix?: {
     dadKey?: string | null
     momKey?: string | null
-    dadQrCode?: string | null
-    momQrCode?: string | null
   }
   pixKeyDad?: string | null
   pixKeyMom?: string | null
-  pixQrcodeDad?: string | null
-  pixQrcodeMom?: string | null
 }
 
 export interface AdminCreateEventPayload {
@@ -97,18 +97,17 @@ export interface AdminCreateEventPayload {
   date: string
   venueAddress: string
   deliveryAddress?: string | null
+  deliveryAddress2?: string | null
+  deliveryAddress3?: string | null
+  eventDetail?: string | null
   mapsLink?: string | null
   coverImageUrl?: string | null
   pix?: {
     dadKey?: string | null
     momKey?: string | null
-    dadQrCode?: string | null
-    momQrCode?: string | null
   }
   pixKeyDad?: string | null
   pixKeyMom?: string | null
-  pixQrcodeDad?: string | null
-  pixQrcodeMom?: string | null
 }
 
 export interface AdminGift {
@@ -143,6 +142,20 @@ export interface AdminGiftInputPayload {
   sortOrder?: number
 }
 
+export interface AdminGiftImportPayload {
+  fileBase64: string
+  fileName?: string
+  fileType?: 'csv' | 'xlsx'
+}
+
+export interface AdminGiftImportResult {
+  imported?: number
+  importedCount?: number
+  created?: number
+  count?: number
+  message?: string
+}
+
 export interface AdminCompanion {
   id: string
   fullName: string
@@ -150,12 +163,11 @@ export interface AdminCompanion {
 
 export interface AdminGuest {
   id: string
+  guestId: string
+  rowType: 'guest' | 'companion'
   fullName: string
-  email: string
+  email: string | null
   confirmedAt: string
-  companionName: string | null
-  companions: AdminCompanion[]
-  totalPeople: number
 }
 
 export interface AdminGuestsSummary {

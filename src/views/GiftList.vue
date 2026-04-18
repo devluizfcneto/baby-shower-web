@@ -1,6 +1,13 @@
 <template>
   <section class="gifts-page">
-    <div class="gifts-page__bg" />
+    <div
+      class="gifts-page__bg"
+      :class="{
+        'gifts-page__bg--custom': hasCustomCover,
+        'gifts-page__bg--default': !hasCustomCover,
+      }"
+      :style="giftsBackgroundStyle"
+    />
 
     <v-container class="gifts-page__content py-8 py-md-12" max-width="1150">
       <v-sheet class="hero pa-6 pa-md-8 mb-6" rounded="xl">
@@ -50,12 +57,13 @@
           md="6"
         >
           <v-card class="gift-card h-100 d-flex flex-column" rounded="xl" variant="elevated">
-            <v-img
-              v-if="gift.imageUrl"
-              cover
-              height="190"
-              :src="gift.imageUrl"
-            />
+            <div v-if="gift.imageUrl" class="gift-card__media">
+              <v-img
+                class="gift-card__image"
+                contain
+                :src="gift.imageUrl"
+              />
+            </div>
 
             <div v-else class="gift-card__placeholder d-flex align-center justify-center">
               <v-icon color="primary" icon="mdi-gift-outline" size="48" />
@@ -236,11 +244,13 @@
   import { confirmGiftPurchase } from '@/api/giftApi'
   import { useEventCode } from '@/composables/useEventCode'
   import { ApiError } from '@/services/http'
+  import { useEventStore } from '@/stores/useEventStore'
   import { useGiftStore } from '@/stores/useGiftStore'
 
   const router = useRouter()
   const { smAndDown } = useDisplay()
   const { eventCode } = useEventCode()
+  const eventStore = useEventStore()
   const giftStore = useGiftStore()
 
   const purchaseFormRef = ref<{ validate: () => Promise<{ valid: boolean }> } | null>(null)
@@ -267,7 +277,16 @@
   })
 
   const resolvedEventCode = computed(() => eventCode.value)
+  const coverImageUrl = computed(() => eventStore.current?.coverImageUrl?.trim() || '')
+  const hasCustomCover = computed(() => Boolean(coverImageUrl.value))
   const toastLocation = computed(() => (smAndDown.value ? 'top' : 'bottom end'))
+  const giftsBackgroundStyle = computed(() => {
+    const source = coverImageUrl.value || '/background_mail.jpg'
+
+    return {
+      backgroundImage: `url("${source}")`,
+    }
+  })
   const manualRefreshRemainingMs = computed(() => {
     const elapsed = nowTimestamp.value - lastManualRefreshAt.value
     return Math.max(0, REFRESH_COOLDOWN_MS - elapsed)
@@ -390,6 +409,14 @@
     if (giftStore.errorMessage) {
       showToast(giftStore.errorMessage, 'error')
     }
+  }
+
+  async function loadEventContext (): Promise<void> {
+    if (!resolvedEventCode.value) {
+      return
+    }
+
+    await eventStore.fetchEventByCode(resolvedEventCode.value)
   }
 
   async function handleManualRefresh (): Promise<void> {
@@ -539,6 +566,7 @@
     }, 1000)
 
     hydrateManualRefreshState()
+    loadEventContext()
     loadGifts()
   })
 
@@ -550,6 +578,7 @@
 
   watch(resolvedEventCode, () => {
     hydrateManualRefreshState()
+    loadEventContext()
     loadGifts()
   })
 </script>
@@ -570,12 +599,30 @@
   .gifts-page__bg {
     position: absolute;
     inset: 0;
-    background-image: url('/background_mail.jpg');
     background-repeat: no-repeat;
+    transition: opacity 220ms ease;
+    pointer-events: none;
+  }
+
+  .gifts-page__bg--default {
     background-size: 580px;
     background-position: right -170px top -62px;
     opacity: 0.13;
-    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+
+  .gifts-page__bg--custom {
+    background-size: cover;
+    background-position: center center;
+    opacity: 0.22;
+    filter: saturate(0.92) contrast(1.05);
+    mask-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.86) 0%,
+      rgba(0, 0, 0, 0.66) 44%,
+      rgba(0, 0, 0, 0.38) 74%,
+      rgba(0, 0, 0, 0.2) 100%
+    );
   }
 
   .gifts-page__content {
@@ -618,11 +665,53 @@
     border: 1px solid rgba(21, 31, 54, 0.09);
     background: rgba(255, 255, 255, 0.95);
     box-shadow: 0 14px 30px rgba(21, 31, 54, 0.08);
+    transition: transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .gift-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 36px rgba(21, 31, 54, 0.12);
+  }
+
+  .gift-card__media {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 210px;
+    aspect-ratio: 16 / 10;
+    padding: 14px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 16% 14%, rgba(81, 106, 138, 0.1), transparent 40%),
+      linear-gradient(145deg, rgba(252, 253, 255, 0.95), rgba(235, 241, 247, 0.86));
+    border-bottom: 1px solid rgba(21, 31, 54, 0.08);
+  }
+
+  .gift-card__media::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 62%, rgba(21, 31, 54, 0.05) 100%);
+    pointer-events: none;
+  }
+
+  .gift-card__image {
+    width: 100%;
+    height: 100%;
+  }
+
+  .gift-card__image :deep(.v-img__img) {
+    object-fit: contain !important;
+    object-position: center center !important;
+    filter: drop-shadow(0 6px 12px rgba(21, 31, 54, 0.14));
   }
 
   .gift-card__placeholder {
-    height: 190px;
+    min-height: 210px;
+    aspect-ratio: 16 / 10;
     background: linear-gradient(140deg, rgba(255, 255, 255, 0.72), rgba(224, 232, 239, 0.8));
+    border-bottom: 1px solid rgba(21, 31, 54, 0.08);
   }
 
   .gift-card__title {
@@ -672,10 +761,21 @@
   }
 
   @media (max-width: 680px) {
-    .gifts-page__bg {
+    .gifts-page__bg--default {
       background-size: 430px;
       background-position: right -185px top -50px;
       opacity: 0.11;
+    }
+
+    .gifts-page__bg--custom {
+      background-position: center top;
+      opacity: 0.2;
+    }
+
+    .gift-card__media,
+    .gift-card__placeholder {
+      min-height: 190px;
+      padding: 12px;
     }
   }
 </style>

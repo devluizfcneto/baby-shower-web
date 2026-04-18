@@ -1,6 +1,6 @@
 export interface RSVPCompanionPayload {
   fullName: string
-  email: string
+  email?: string
 }
 
 export interface RSVPCreatePayload {

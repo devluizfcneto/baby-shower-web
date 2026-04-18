@@ -6,7 +6,7 @@
           <div>
             <p class="config__eyebrow">UC-07</p>
             <h1 class="config__title">Configuracoes do evento</h1>
-            <p class="config__subtitle">Atualize dados principais, links e chaves Pix do seu evento.</p>
+            <p class="config__subtitle">Atualize dados principais, enderecos de entrega, detalhes do evento, links e chaves Pix.</p>
           </div>
 
           <v-btn
@@ -61,7 +61,23 @@
             v-model="form.deliveryAddress"
             class="mt-2"
             density="comfortable"
-            label="Endereco para entrega de presentes"
+            label="Endereco de entrega principal"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model="form.deliveryAddress2"
+            class="mt-2"
+            density="comfortable"
+            label="Endereco de entrega secundario"
+            variant="outlined"
+          />
+
+          <v-text-field
+            v-model="form.deliveryAddress3"
+            class="mt-2"
+            density="comfortable"
+            label="Endereco de entrega reserva"
             variant="outlined"
           />
 
@@ -81,6 +97,16 @@
             variant="outlined"
           />
 
+          <v-textarea
+            v-model="form.eventDetail"
+            auto-grow
+            class="mt-2"
+            density="comfortable"
+            label="Detalhes do evento"
+            rows="3"
+            variant="outlined"
+          />
+
           <v-row class="mt-2" dense>
             <v-col cols="12" md="6">
               <v-text-field
@@ -96,30 +122,6 @@
                 v-model="form.pixKeyMom"
                 density="comfortable"
                 label="Chave Pix da mamae"
-                variant="outlined"
-              />
-            </v-col>
-          </v-row>
-
-          <v-row dense>
-            <v-col cols="12" md="6">
-              <v-textarea
-                v-model="form.pixQrcodeDad"
-                auto-grow
-                density="comfortable"
-                label="QR Code Pix do papai (base64)"
-                rows="2"
-                variant="outlined"
-              />
-            </v-col>
-
-            <v-col cols="12" md="6">
-              <v-textarea
-                v-model="form.pixQrcodeMom"
-                auto-grow
-                density="comfortable"
-                label="QR Code Pix da mamae (base64)"
-                rows="2"
                 variant="outlined"
               />
             </v-col>
@@ -175,12 +177,13 @@
     date: '',
     venueAddress: '',
     deliveryAddress: '',
+    deliveryAddress2: '',
+    deliveryAddress3: '',
     mapsLink: '',
     coverImageUrl: '',
+    eventDetail: '',
     pixKeyDad: '',
     pixKeyMom: '',
-    pixQrcodeDad: '',
-    pixQrcodeMom: '',
   })
 
   const eventId = computed(() => String(route.params.event_id || ''))
@@ -229,12 +232,13 @@
       form.date = toDatetimeLocal(eventItem.date)
       form.venueAddress = eventItem.venueAddress
       form.deliveryAddress = eventItem.deliveryAddress || ''
+      form.deliveryAddress2 = eventItem.deliveryAddress2 || ''
+      form.deliveryAddress3 = eventItem.deliveryAddress3 || ''
       form.mapsLink = eventItem.mapsLink || ''
       form.coverImageUrl = eventItem.coverImageUrl || ''
+      form.eventDetail = eventItem.eventDetail || ''
       form.pixKeyDad = eventItem.pixKeyDad || ''
       form.pixKeyMom = eventItem.pixKeyMom || ''
-      form.pixQrcodeDad = eventItem.pixQrcodeDad || ''
-      form.pixQrcodeMom = eventItem.pixQrcodeMom || ''
     } catch (error) {
       handleApiError(error, 'Nao foi possivel carregar as configuracoes do evento.')
     } finally {
@@ -261,13 +265,14 @@
         date: fromDatetimeLocal(form.date),
         venueAddress: form.venueAddress.trim(),
         deliveryAddress: form.deliveryAddress.trim() || null,
+        deliveryAddress2: form.deliveryAddress2.trim() || null,
+        deliveryAddress3: form.deliveryAddress3.trim() || null,
         mapsLink: form.mapsLink.trim() || null,
         coverImageUrl: form.coverImageUrl.trim() || null,
+        eventDetail: form.eventDetail.trim() || null,
         pix: {
           dadKey: form.pixKeyDad.trim() || null,
           momKey: form.pixKeyMom.trim() || null,
-          dadQrCode: form.pixQrcodeDad.trim() || null,
-          momQrCode: form.pixQrcodeMom.trim() || null,
         },
       })
 

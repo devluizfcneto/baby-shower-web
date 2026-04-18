@@ -267,7 +267,21 @@
               <v-text-field
                 v-model="createDialog.deliveryAddress"
                 density="comfortable"
-                label="Endereco para entrega de presentes"
+                label="Endereco de entrega principal"
+                variant="outlined"
+              />
+
+              <v-text-field
+                v-model="createDialog.deliveryAddress2"
+                density="comfortable"
+                label="Endereco de entrega secundario"
+                variant="outlined"
+              />
+
+              <v-text-field
+                v-model="createDialog.deliveryAddress3"
+                density="comfortable"
+                label="Endereco de entrega reserva"
                 variant="outlined"
               />
 
@@ -282,6 +296,15 @@
                 v-model="createDialog.coverImageUrl"
                 density="comfortable"
                 label="URL da imagem de capa"
+                variant="outlined"
+              />
+
+              <v-textarea
+                v-model="createDialog.eventDetail"
+                auto-grow
+                density="comfortable"
+                label="Detalhes do evento"
+                rows="3"
                 variant="outlined"
               />
 
@@ -304,29 +327,6 @@
                 </v-col>
               </v-row>
 
-              <v-row dense>
-                <v-col cols="12" md="6">
-                  <v-textarea
-                    v-model="createDialog.pixQrcodeDad"
-                    auto-grow
-                    density="comfortable"
-                    label="QR Code Pix do papai (base64)"
-                    rows="2"
-                    variant="outlined"
-                  />
-                </v-col>
-
-                <v-col cols="12" md="6">
-                  <v-textarea
-                    v-model="createDialog.pixQrcodeMom"
-                    auto-grow
-                    density="comfortable"
-                    label="QR Code Pix da mamae (base64)"
-                    rows="2"
-                    variant="outlined"
-                  />
-                </v-col>
-              </v-row>
             </v-form>
           </v-card-text>
           <v-card-actions class="pb-4 px-4 d-flex ga-2">
@@ -401,12 +401,13 @@
     date: '',
     venueAddress: '',
     deliveryAddress: '',
+    deliveryAddress2: '',
+    deliveryAddress3: '',
     mapsLink: '',
     coverImageUrl: '',
+    eventDetail: '',
     pixKeyDad: '',
     pixKeyMom: '',
-    pixQrcodeDad: '',
-    pixQrcodeMom: '',
   })
 
   const statusItems = [
@@ -471,12 +472,13 @@
     createDialog.date = ''
     createDialog.venueAddress = ''
     createDialog.deliveryAddress = ''
+    createDialog.deliveryAddress2 = ''
+    createDialog.deliveryAddress3 = ''
     createDialog.mapsLink = ''
     createDialog.coverImageUrl = ''
+    createDialog.eventDetail = ''
     createDialog.pixKeyDad = ''
     createDialog.pixKeyMom = ''
-    createDialog.pixQrcodeDad = ''
-    createDialog.pixQrcodeMom = ''
   }
 
   function openCreateDialog (): void {
@@ -528,13 +530,14 @@
         date: fromDatetimeLocal(createDialog.date),
         venueAddress: createDialog.venueAddress.trim(),
         deliveryAddress: createDialog.deliveryAddress.trim() || null,
+        deliveryAddress2: createDialog.deliveryAddress2.trim() || null,
+        deliveryAddress3: createDialog.deliveryAddress3.trim() || null,
         mapsLink: createDialog.mapsLink.trim() || null,
         coverImageUrl: createDialog.coverImageUrl.trim() || null,
+        eventDetail: createDialog.eventDetail.trim() || null,
         pix: {
           dadKey: createDialog.pixKeyDad.trim() || null,
           momKey: createDialog.pixKeyMom.trim() || null,
-          dadQrCode: createDialog.pixQrcodeDad.trim() || null,
-          momQrCode: createDialog.pixQrcodeMom.trim() || null,
         },
       })
 

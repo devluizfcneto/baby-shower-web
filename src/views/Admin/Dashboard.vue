@@ -101,8 +101,29 @@
 
               <v-col cols="12">
                 <div class="detail-field">
-                  <span class="detail-field__label">Endereco para entrega de presentes</span>
+                  <span class="detail-field__label">Endereco de entrega principal</span>
                   <strong class="detail-field__value">{{ event.deliveryAddress || 'Nao informado' }}</strong>
+                </div>
+              </v-col>
+
+              <v-col cols="12">
+                <div class="detail-field">
+                  <span class="detail-field__label">Endereco de entrega secundario</span>
+                  <strong class="detail-field__value">{{ event.deliveryAddress2 || 'Nao informado' }}</strong>
+                </div>
+              </v-col>
+
+              <v-col cols="12">
+                <div class="detail-field">
+                  <span class="detail-field__label">Endereco de entrega reserva</span>
+                  <strong class="detail-field__value">{{ event.deliveryAddress3 || 'Nao informado' }}</strong>
+                </div>
+              </v-col>
+
+              <v-col cols="12">
+                <div class="detail-field">
+                  <span class="detail-field__label">Detalhes do evento</span>
+                  <strong class="detail-field__value text-break">{{ event.eventDetail || 'Nao informado' }}</strong>
                 </div>
               </v-col>
 
@@ -231,36 +252,6 @@
                       Copiar
                     </v-btn>
                   </div>
-                </div>
-              </v-col>
-
-              <v-col cols="12" md="6">
-                <div class="detail-field">
-                  <span class="detail-field__label">QR Code Pix do papai</span>
-                  <v-textarea
-                    auto-grow
-                    density="comfortable"
-                    hide-details
-                    :model-value="event.pixQrcodeDad || 'Nao informado'"
-                    readonly
-                    rows="3"
-                    variant="outlined"
-                  />
-                </div>
-              </v-col>
-
-              <v-col cols="12" md="6">
-                <div class="detail-field">
-                  <span class="detail-field__label">QR Code Pix da mamae</span>
-                  <v-textarea
-                    auto-grow
-                    density="comfortable"
-                    hide-details
-                    :model-value="event.pixQrcodeMom || 'Nao informado'"
-                    readonly
-                    rows="3"
-                    variant="outlined"
-                  />
                 </div>
               </v-col>
             </v-row>

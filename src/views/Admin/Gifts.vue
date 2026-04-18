@@ -147,6 +147,31 @@
 
         <v-col cols="12" lg="8">
           <v-sheet class="gift-list pa-4 pa-md-5" rounded="xl">
+            <div class="d-flex flex-wrap align-center justify-space-between ga-2 mb-3">
+              <h2 class="gift-form__title mb-0">Presentes cadastrados</h2>
+
+              <div class="d-flex align-center ga-2 flex-wrap">
+                <v-btn
+                  color="primary"
+                  :loading="isImporting"
+                  prepend-icon="mdi-file-import-outline"
+                  rounded="pill"
+                  variant="tonal"
+                  @click="openImportDialog"
+                >
+                  Importar Excel/CSV
+                </v-btn>
+
+                <v-btn
+                  icon="mdi-microsoft-excel"
+                  rounded="pill"
+                  title="Baixar template de importacao"
+                  variant="text"
+                  @click="downloadImportTemplate"
+                />
+              </div>
+            </div>
+
             <v-progress-linear v-if="isLoading" class="mb-4" color="primary" indeterminate />
 
             <v-table v-if="gifts.length > 0" density="comfortable" hover>
@@ -213,6 +238,14 @@
               icon="mdi-gift-off-outline"
               text="Adicione o primeiro presente para liberar a lista publica."
             />
+
+            <input
+              ref="fileInputRef"
+              accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              class="d-none"
+              type="file"
+              @change="onImportFileSelected"
+            >
           </v-sheet>
         </v-col>
       </v-row>
@@ -233,9 +266,11 @@
   import type { AdminGift } from '@/types/admin'
   import { computed, onMounted, reactive, ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
+  import { utils, writeFileXLSX } from 'xlsx'
   import {
     createAdminEventGift,
     deleteAdminEventGift,
+    importAdminEventGifts,
     listAdminEventGifts,
     toggleAdminEventGiftBlock,
     updateAdminEventGift,
@@ -253,7 +288,9 @@
   const gifts = ref<AdminGift[]>([])
   const isLoading = ref(false)
   const isSaving = ref(false)
+  const isImporting = ref(false)
   const editingGiftId = ref('')
+  const fileInputRef = ref<HTMLInputElement | null>(null)
 
   const form = reactive({
     name: '',
@@ -408,6 +445,157 @@
     } catch (error) {
       handleApiError(error, 'Nao foi possivel excluir o presente.')
     }
+  }
+
+  function openImportDialog (): void {
+    fileInputRef.value?.click()
+  }
+
+  function resolveImportFileType (fileName: string, fileMimeType: string): 'csv' | 'xlsx' | null {
+    const normalizedName = fileName.toLowerCase()
+
+    if (normalizedName.endsWith('.csv') || fileMimeType.includes('csv')) {
+      return 'csv'
+    }
+
+    if (
+      normalizedName.endsWith('.xlsx')
+      || fileMimeType.includes('spreadsheetml')
+      || fileMimeType.includes('excel')
+    ) {
+      return 'xlsx'
+    }
+
+    return null
+  }
+
+  function readFileAsBase64 (file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+
+      reader.addEventListener('load', () => {
+        if (typeof reader.result !== 'string') {
+          reject(new Error('Arquivo invalido'))
+          return
+        }
+
+        const [, base64 = ''] = reader.result.split(',')
+        resolve(base64)
+      })
+
+      reader.addEventListener('error', () => {
+        reject(new Error('Nao foi possivel ler o arquivo'))
+      })
+
+      reader.readAsDataURL(file)
+    })
+  }
+
+  function getImportedCount (result: {
+    imported?: number
+    importedCount?: number
+    created?: number
+    count?: number
+  }): number {
+    return Number(result.imported ?? result.importedCount ?? result.created ?? result.count ?? 0)
+  }
+
+  async function onImportFileSelected (event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    if (!eventId.value) {
+      showToast('Evento invalido.', 'error')
+      input.value = ''
+      return
+    }
+
+    const fileType = resolveImportFileType(file.name, file.type)
+
+    if (!fileType) {
+      showToast('Use um arquivo CSV ou XLSX valido.', 'error')
+      input.value = ''
+      return
+    }
+
+    isImporting.value = true
+
+    try {
+      const fileBase64 = await readFileAsBase64(file)
+      const result = await importAdminEventGifts(eventId.value, {
+        fileBase64,
+        fileName: file.name,
+        fileType,
+      })
+
+      const importedCount = getImportedCount(result)
+
+      if (importedCount > 0) {
+        showToast(`${importedCount} presente(s) importado(s) com sucesso.`, 'success')
+      } else {
+        showToast(result.message || 'Importacao concluida com sucesso.', 'success')
+      }
+
+      await loadGifts()
+    } catch (error) {
+      handleApiError(error, 'Nao foi possivel importar o arquivo.')
+    } finally {
+      isImporting.value = false
+      input.value = ''
+    }
+  }
+
+  function downloadImportTemplate (): void {
+    const now = new Date().toISOString()
+    const headers = [
+      'name',
+      'description',
+      'image_url',
+      'marketplace_url',
+      'marketplace',
+      'max_quantity',
+      'confirmed_quantity',
+      'is_blocked',
+      'created_at',
+      'updated_at',
+    ]
+
+    const rows = [
+      {
+        name: 'Fraldas tamanho M',
+        description: 'Pacote com 90 unidades',
+        image_url: 'https://images.example.com/fralda-m.jpg',
+        marketplace_url: 'https://www.amazon.com.br/dp/B0XXXXXXX',
+        marketplace: 'amazon',
+        max_quantity: 2,
+        confirmed_quantity: 0,
+        is_blocked: false,
+        created_at: now,
+        updated_at: now,
+      },
+    ]
+
+    const worksheet = utils.json_to_sheet(rows, { header: headers })
+    worksheet['!cols'] = [
+      { wch: 28 },
+      { wch: 36 },
+      { wch: 48 },
+      { wch: 48 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 28 },
+      { wch: 28 },
+    ]
+
+    const workbook = utils.book_new()
+    utils.book_append_sheet(workbook, worksheet, 'gifts_import')
+    writeFileXLSX(workbook, 'template-importacao-presentes.xlsx')
   }
 
   function resetForm (): void {

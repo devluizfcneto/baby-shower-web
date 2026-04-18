@@ -1,19 +1,16 @@
 <template>
   <section class="event-home">
-    <div class="event-home__wallpaper" />
+    <div
+      class="event-home__wallpaper"
+      :class="{
+        'event-home__wallpaper--custom': hasCustomCover,
+        'event-home__wallpaper--default': !hasCustomCover,
+      }"
+      :style="wallpaperStyle"
+    />
     <div class="event-home__noise" />
 
     <v-container class="event-home__content py-8 py-md-12" max-width="1120">
-      <v-alert
-        v-if="eventStore.errorMessage"
-        class="mb-6"
-        closable
-        type="error"
-        variant="tonal"
-      >
-        {{ eventStore.errorMessage }}
-      </v-alert>
-
       <v-skeleton-loader
         v-if="eventStore.isLoading"
         class="event-home__loading"
@@ -35,7 +32,16 @@
             <span v-if="venueAddress"> • {{ venueAddress }}</span>
           </p>
 
-          <p v-if="hasPixInfo" class="hero__note">Contribuicao via Pix disponivel para este evento.</p>
+          <v-chip
+            v-if="countdownLabel"
+            class="hero__countdown mt-3"
+            color="primary"
+            prepend-icon="mdi-timer-outline"
+            size="small"
+            variant="tonal"
+          >
+            {{ countdownLabel }}
+          </v-chip>
 
           <div class="hero__actions">
             <v-btn
@@ -76,55 +82,65 @@
           </div>
         </v-sheet>
 
-        <v-row class="mt-4 mt-md-6" dense>
-          <v-col cols="12" md="6">
-            <v-sheet class="info-card pa-4 pa-md-5" rounded="xl">
-              <p class="info-card__label">Data e horario</p>
-              <p class="info-card__value">{{ eventDateLabel }}</p>
-            </v-sheet>
-          </v-col>
-
-          <v-col cols="12" md="6">
-            <v-sheet class="info-card pa-4 pa-md-5" rounded="xl">
-              <p class="info-card__label">Local</p>
-              <p class="info-card__value">{{ venueAddress || 'Em breve' }}</p>
-            </v-sheet>
-          </v-col>
-        </v-row>
-
         <v-sheet class="details mt-4 mt-md-6 pa-5 pa-md-8" rounded="xl">
           <h2 class="details__title">Detalhes do evento</h2>
 
           <v-row class="mt-1" dense>
-            <v-col cols="12" md="7">
-              <p class="details__text">
-                Estamos preparando uma celebracao especial e ficaremos muito felizes com sua presenca.
-                Confirme sua participacao e explore nossa lista de presentes.
-              </p>
+            <v-col cols="12">
+              <p class="details__text">{{ eventDetailText }}</p>
 
               <p v-if="deliveryAddress" class="details__text mt-4">
-                Endereco para entrega de presentes: {{ deliveryAddress }}
+                Endereco de entrega principal: {{ deliveryAddress }}
               </p>
 
-              <div class="details__pix mt-4">
-                <p class="info-card__label">Pix</p>
-                <p v-if="dadPixKey || momPixKey" class="details__text">
-                  <span v-if="dadPixKey">Responsavel 1: {{ dadPixKey }}</span>
-                  <br v-if="dadPixKey && momPixKey">
-                  <span v-if="momPixKey">Responsavel 2: {{ momPixKey }}</span>
-                </p>
-                <p v-else class="details__text">As chaves Pix ainda nao foram informadas.</p>
-              </div>
-            </v-col>
+              <p v-if="deliveryAddress2" class="details__text mt-2">
+                Endereco de entrega secundario: {{ deliveryAddress2 }}
+              </p>
 
-            <v-col class="d-flex justify-md-end align-end" cols="12" md="5">
-              <v-sheet v-if="coverImageUrl" class="details__cover mb-4" rounded="lg">
-                <v-img class="details__cover-image" cover height="190" :src="coverImageUrl" />
-              </v-sheet>
+              <p v-if="deliveryAddress3" class="details__text mt-2">
+                Endereco de entrega reserva: {{ deliveryAddress3 }}
+              </p>
+            </v-col>
+          </v-row>
+        </v-sheet>
+
+        <v-row class="mt-4 mt-md-6" dense>
+          <v-col cols="12">
+            <v-sheet class="info-card pa-4 pa-md-5" rounded="xl">
+              <p class="info-card__label">Local</p>
+              <div class="location-row">
+                <p class="info-card__value">{{ venueAddress || 'Em breve' }}</p>
+                <v-btn
+                  v-if="venueAddress"
+                  class="location-copy"
+                  density="comfortable"
+                  icon="mdi-content-copy"
+                  size="small"
+                  variant="text"
+                  @click="copyVenueAddress"
+                />
+              </div>
+
+              <div v-if="mapEmbedSrc" class="location-map mt-3">
+                <iframe
+                  allowfullscreen
+                  class="location-map__iframe"
+                  loading="lazy"
+                  referrerpolicy="no-referrer-when-downgrade"
+                  :src="mapEmbedSrc"
+                  title="Mapa do local do evento"
+                />
+              </div>
+
+              <div v-else class="location-empty mt-3">
+                <v-icon class="location-empty__icon" icon="mdi-map-marker-off" size="30" />
+                <p class="location-empty__title">Nao contem informacao</p>
+                <p class="location-empty__text">O link do mapa ainda nao foi informado para este evento.</p>
+              </div>
 
               <v-btn
                 v-if="mapsLink"
-                class="details__map"
+                class="details__map mt-3"
                 color="primary"
                 :href="mapsLink"
                 prepend-icon="mdi-map-marker"
@@ -136,17 +152,27 @@
               >
                 Abrir local no mapa
               </v-btn>
-            </v-col>
-          </v-row>
-        </v-sheet>
+            </v-sheet>
+          </v-col>
+        </v-row>
       </template>
+
+      <v-snackbar
+        v-model="toast.visible"
+        :color="toast.color"
+        :location="toastLocation"
+        :timeout="2000"
+      >
+        {{ toast.message }}
+      </v-snackbar>
     </v-container>
   </section>
 </template>
 
 <script setup lang="ts">
-  import { computed, watch } from 'vue'
+  import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
+  import { useAppToast } from '@/composables/useAppToast'
   import { useEventCode } from '@/composables/useEventCode'
   import { useEventStore } from '@/stores/useEventStore'
 
@@ -155,19 +181,33 @@
   const router = useRouter()
   const { eventCode } = useEventCode()
   const eventStore = useEventStore()
+  const { toast, toastLocation, showToast } = useAppToast()
+  const nowTimestamp = ref(Date.now())
+  const countdownTicker = ref<ReturnType<typeof setInterval> | null>(null)
 
   const resolvedEventCode = computed(() => eventCode.value)
   const eventData = computed<EventLike>(() => (eventStore.current ?? {}) as EventLike)
 
   const eventTitle = computed(() => readField(['name', 'event_name']) || 'Baby Shower')
-  const eventDateLabel = computed(() => formatDate(readField(['date', 'event_date'])))
+  const eventDateIso = computed(() => readField(['date', 'event_date']))
+  const eventDateLabel = computed(() => formatDate(eventDateIso.value))
   const venueAddress = computed(() => readField(['venueAddress', 'venue_address']))
   const deliveryAddress = computed(() => readField(['deliveryAddress', 'delivery_address']))
+  const deliveryAddress2 = computed(() => readField(['deliveryAddress2', 'delivery_address2']))
+  const deliveryAddress3 = computed(() => readField(['deliveryAddress3', 'delivery_address3']))
   const mapsLink = computed(() => readField(['mapsLink', 'maps_link']))
   const coverImageUrl = computed(() => readField(['coverImageUrl', 'cover_image_url']))
-  const dadPixKey = computed(() => readField(['pix.dadKey', 'pix.dad_key']))
-  const momPixKey = computed(() => readField(['pix.momKey', 'pix.mom_key']))
-  const hasPixInfo = computed(() => Boolean(dadPixKey.value || momPixKey.value))
+  const eventDetailText = computed(() => readField(['eventDetail', 'event_detail']) || 'Estamos preparando uma celebracao especial e ficaremos muito felizes com sua presenca. Confirme sua participacao e explore nossa lista de presentes.')
+  const hasCustomCover = computed(() => Boolean(coverImageUrl.value))
+  const mapEmbedSrc = computed(() => buildMapEmbedSrc(mapsLink.value))
+  const countdownLabel = computed(() => formatCountdown(eventDateIso.value, nowTimestamp.value))
+  const wallpaperStyle = computed(() => {
+    const source = coverImageUrl.value || '/background_mail.jpg'
+
+    return {
+      backgroundImage: `url("${source}")`,
+    }
+  })
 
   async function loadEvent (): Promise<void> {
     if (!resolvedEventCode.value) return
@@ -189,6 +229,97 @@
       .reduce<unknown>((acc, item) => (typeof acc === 'object' && acc !== null ? (acc as EventLike)[item] : undefined), data)
   }
 
+  function extractMapQuery (value: string): string {
+    if (!value) {
+      return ''
+    }
+
+    try {
+      const url = new URL(value)
+      const queryFromSearch = url.searchParams.get('q') || url.searchParams.get('query')
+
+      if (queryFromSearch && queryFromSearch.trim()) {
+        return queryFromSearch.trim()
+      }
+
+      const path = decodeURIComponent(url.pathname || '')
+      if (path.includes('/place/')) {
+        const place = path.split('/place/')[1]?.split('/')[0]
+        if (place) {
+          return place.replaceAll('+', ' ')
+        }
+      }
+    } catch {
+      return value
+    }
+
+    return value
+  }
+
+  function buildMapEmbedSrc (link: string): string {
+    const normalizedLink = link.trim()
+
+    if (!normalizedLink) {
+      return ''
+    }
+
+    if (normalizedLink.includes('google.com/maps/embed')) {
+      return normalizedLink
+    }
+
+    const query = extractMapQuery(normalizedLink)
+
+    if (!query) {
+      return ''
+    }
+
+    return `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`
+  }
+
+  function formatCountdown (dateValue: string, nowMs: number): string {
+    if (!dateValue) {
+      return ''
+    }
+
+    const eventDate = new Date(dateValue)
+    const eventMs = eventDate.getTime()
+
+    if (Number.isNaN(eventMs)) {
+      return ''
+    }
+
+    const diff = eventMs - nowMs
+
+    if (diff <= 0) {
+      return 'Evento iniciado'
+    }
+
+    const totalMinutes = Math.floor(diff / 60_000)
+    const days = Math.floor(totalMinutes / (60 * 24))
+    const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
+    const minutes = totalMinutes % 60
+
+    if (days > 0) {
+      return `Faltam ${days}d ${hours}h ${minutes}min`
+    }
+
+    return `Faltam ${hours}h ${minutes}min`
+  }
+
+  async function copyVenueAddress (): Promise<void> {
+    if (!venueAddress.value) {
+      showToast('Endereco ainda nao informado.', 'error')
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(venueAddress.value)
+      showToast('Endereco copiado.', 'success')
+    } catch {
+      showToast('Nao foi possivel copiar o endereco.', 'error')
+    }
+  }
+
   function formatDate (value: string): string {
     if (!value) return 'Data sera divulgada em breve'
 
@@ -202,6 +333,36 @@
   }
 
   watch(resolvedEventCode, loadEvent, { immediate: true })
+
+  watch(() => eventStore.errorMessage, message => {
+    if (!message) {
+      return
+    }
+
+    if (message.toLowerCase().includes('nao foi encontrado')) {
+      showToast('Evento nao encontrado.', 'error')
+      return
+    }
+
+    if (message.toLowerCase().includes('encerrado')) {
+      showToast('Este evento foi encerrado.', 'error')
+      return
+    }
+
+    showToast('Nao foi possivel carregar o evento.', 'error')
+  })
+
+  onMounted(() => {
+    countdownTicker.value = setInterval(() => {
+      nowTimestamp.value = Date.now()
+    }, 1000)
+  })
+
+  onBeforeUnmount(() => {
+    if (countdownTicker.value) {
+      clearInterval(countdownTicker.value)
+    }
+  })
 </script>
 
 <style scoped>
@@ -229,8 +390,12 @@
   .event-home__wallpaper {
     position: absolute;
     inset: 0;
-    background-image: url('/background_mail.jpg');
     background-repeat: no-repeat;
+    transition: opacity 220ms ease;
+    pointer-events: none;
+  }
+
+  .event-home__wallpaper--default {
     background-size: 560px;
     background-position: right -150px top -86px;
     opacity: 0.18;
@@ -244,7 +409,20 @@
       transparent 78%,
       transparent 100%
     );
-    pointer-events: none;
+  }
+
+  .event-home__wallpaper--custom {
+    background-size: cover;
+    background-position: center center;
+    opacity: 0.24;
+    filter: saturate(0.9) contrast(1.08);
+    mask-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.88) 0%,
+      rgba(0, 0, 0, 0.74) 40%,
+      rgba(0, 0, 0, 0.42) 72%,
+      rgba(0, 0, 0, 0.2) 100%
+    );
   }
 
   .event-home__noise {
@@ -327,6 +505,11 @@
     font-family: 'Manrope', sans-serif;
     font-size: 0.95rem;
     line-height: 1.6;
+  }
+
+  .hero__countdown {
+    font-weight: 700;
+    letter-spacing: 0.01em;
   }
 
   .hero__actions {
@@ -434,6 +617,73 @@
     line-height: 1.45;
   }
 
+  .location-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .location-copy {
+    margin-top: 4px;
+  }
+
+  .location-map {
+    overflow: hidden;
+    border: 1px solid rgba(21, 31, 54, 0.12);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 10px 20px rgba(21, 31, 54, 0.08);
+  }
+
+  .location-map__iframe {
+    display: block;
+    width: 100%;
+    height: 300px;
+    border: 0;
+  }
+
+  .location-empty {
+    display: grid;
+    place-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 18px 14px;
+    min-height: 220px;
+    border: 1px dashed rgba(21, 31, 54, 0.18);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.75);
+    text-align: center;
+  }
+
+  .location-empty__icon {
+    color: #5f6f8f;
+  }
+
+  .location-empty__title {
+    margin: 0;
+    color: var(--ink);
+    font-family: 'Manrope', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .location-empty__text {
+    margin: 0;
+    color: var(--ink-soft);
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    max-width: 46ch;
+    overflow-wrap: anywhere;
+  }
+
   .details {
     border: 1px solid rgba(21, 31, 54, 0.1);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(239, 245, 248, 0.86));
@@ -522,10 +772,15 @@
   }
 
   @media (max-width: 680px) {
-    .event-home__wallpaper {
+    .event-home__wallpaper--default {
       background-size: 420px;
       background-position: right -160px top -78px;
       opacity: 0.15;
+    }
+
+    .event-home__wallpaper--custom {
+      background-position: center top;
+      opacity: 0.2;
     }
 
     .hero__actions {
@@ -570,6 +825,16 @@
     .planet--saturn::before {
       inset: 16px -10px;
       border-width: 2px;
+    }
+
+    .location-map__iframe {
+      height: 300px;
+    }
+  }
+
+  @media (min-width: 960px) {
+    .location-map__iframe {
+      height: 450px;
     }
   }
 

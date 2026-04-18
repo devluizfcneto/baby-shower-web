@@ -1,6 +1,13 @@
 <template>
   <section class="confirm-page">
-    <div class="confirm-page__wallpaper" />
+    <div
+      class="confirm-page__wallpaper"
+      :class="{
+        'confirm-page__wallpaper--custom': hasCustomCover,
+        'confirm-page__wallpaper--default': !hasCustomCover,
+      }"
+      :style="wallpaperStyle"
+    />
 
     <v-container class="confirm-page__content py-8 py-md-12" max-width="980">
       <v-sheet class="hero pa-5 pa-md-8 mb-4" rounded="xl">
@@ -43,7 +50,7 @@
           <div class="companions mt-4">
             <div class="companions__header">
               <p class="companions__title">Acompanhantes (opcional)</p>
-              <p class="companions__subtitle">Voce pode adicionar ate 2 acompanhantes. Nome e e-mail sao obrigatorios para cada acompanhante adicionado.</p>
+              <p class="companions__subtitle">Voce pode adicionar ate 2 acompanhantes. O nome e obrigatorio e o e-mail e opcional.</p>
             </div>
 
             <v-row dense>
@@ -62,7 +69,7 @@
                     v-model="companion.email"
                     density="comfortable"
                     :disabled="hasConfirmed"
-                    :label="`E-mail do acompanhante ${index + 1}`"
+                    :label="`E-mail do acompanhante ${index + 1} (opcional)`"
                     :rules="companionEmailRules"
                     type="email"
                     variant="outlined"
@@ -164,8 +171,17 @@
   const eventTitle = computed(() => eventStore.current?.name || 'Evento')
   const venueAddress = computed(() => eventStore.current?.venueAddress || '')
   const eventDateLabel = computed(() => formatDate(eventStore.current?.date || ''))
+  const coverImageUrl = computed(() => eventStore.current?.coverImageUrl?.trim() || '')
+  const hasCustomCover = computed(() => Boolean(coverImageUrl.value))
   const submitButtonLabel = computed(() => (hasConfirmed.value ? 'Confirmado!' : 'Confirmar presenca'))
   const toastLocation = computed(() => (smAndDown.value ? 'top' : 'bottom end'))
+  const wallpaperStyle = computed(() => {
+    const source = coverImageUrl.value || '/background_mail.jpg'
+
+    return {
+      backgroundImage: `url("${source}")`,
+    }
+  })
 
   const fullNameRules = [
     (value: string) => !!value.trim() || 'Informe seu nome completo',
@@ -183,8 +199,7 @@
   ]
 
   const companionEmailRules = [
-    (value: string) => !!value.trim() || 'Informe o e-mail do acompanhante',
-    (value: string) => /\S+@\S+\.\S+/.test(value) || 'Informe um e-mail valido',
+    (value: string) => !value.trim() || /\S+@\S+\.\S+/.test(value) || 'Informe um e-mail valido',
   ]
 
   function addCompanion (): void {
@@ -286,7 +301,7 @@
     const companions = form.companions
       .map(companion => ({
         fullName: companion.fullName.trim(),
-        email: companion.email.trim(),
+        email: companion.email?.trim() || '',
       }))
       .filter(companion => companion.fullName || companion.email)
 
@@ -296,11 +311,11 @@
     }
 
     const hasInvalidCompanion = companions.some(companion => {
-      return companion.fullName.length < 3 || !/\S+@\S+\.\S+/.test(companion.email)
+      return companion.fullName.length < 3 || (Boolean(companion.email) && !/\S+@\S+\.\S+/.test(companion.email))
     })
 
     if (hasInvalidCompanion) {
-      showToast('Cada acompanhante precisa de nome e e-mail validos.', 'error')
+      showToast('Cada acompanhante precisa de nome valido e e-mail valido quando informado.', 'error')
       return
     }
 
@@ -310,12 +325,20 @@
       await submitRsvp(resolvedEventCode.value, {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
-        companions: companions.length > 0 ? companions : undefined,
+        companions: companions.length > 0
+          ? companions.map(companion => ({
+            fullName: companion.fullName,
+            ...(companion.email ? { email: companion.email } : {}),
+          }))
+          : undefined,
       })
 
       form.fullName = form.fullName.trim()
       form.email = form.email.trim()
-      form.companions = companions
+      form.companions = companions.map(companion => ({
+        fullName: companion.fullName,
+        email: companion.email,
+      }))
       persistFormData()
 
       hasConfirmed.value = true
@@ -434,12 +457,30 @@
   .confirm-page__wallpaper {
     position: absolute;
     inset: 0;
-    background-image: url('/background_mail.jpg');
     background-repeat: no-repeat;
+    transition: opacity 220ms ease;
+    pointer-events: none;
+  }
+
+  .confirm-page__wallpaper--default {
     background-size: 540px;
     background-position: right -170px top -62px;
     opacity: 0.14;
-    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+
+  .confirm-page__wallpaper--custom {
+    background-size: cover;
+    background-position: center center;
+    opacity: 0.22;
+    filter: saturate(0.92) contrast(1.06);
+    mask-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.84) 0%,
+      rgba(0, 0, 0, 0.66) 44%,
+      rgba(0, 0, 0, 0.36) 74%,
+      rgba(0, 0, 0, 0.18) 100%
+    );
   }
 
   .confirm-page__content {
@@ -518,10 +559,15 @@
   }
 
   @media (max-width: 680px) {
-    .confirm-page__wallpaper {
+    .confirm-page__wallpaper--default {
       background-size: 420px;
       background-position: right -175px top -56px;
       opacity: 0.12;
+    }
+
+    .confirm-page__wallpaper--custom {
+      background-position: center top;
+      opacity: 0.2;
     }
 
     .submit-btn {

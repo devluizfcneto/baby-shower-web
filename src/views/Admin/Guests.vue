@@ -60,9 +60,8 @@
           <tr class="bg-grey-100">
             <th class="text-center pa-4">#</th>
             <th class="text-left pa-4">Nome</th>
+            <th class="text-left pa-4">Tipo</th>
             <th class="text-left pa-4">E-mail</th>
-            <th class="text-left pa-4">Acompanhante</th>
-            <th class="text-center pa-4">Total de Pessoas</th>
             <th class="text-left pa-4">Data de Confirmação</th>
           </tr>
         </thead>
@@ -70,16 +69,16 @@
           <tr v-for="guest in numberedGuests" :key="guest.id" class="border-b">
             <td class="text-center pa-4 font-weight-bold">{{ guest.position }}</td>
             <td class="pa-4 font-weight-500">{{ guest.fullName }}</td>
-            <td class="pa-4">{{ guest.email }}</td>
             <td class="pa-4">
-              <span v-if="guest.companionName">{{ guest.companionName }}</span>
-              <span v-else class="text-grey-600">—</span>
-            </td>
-            <td class="text-center pa-4 font-weight-500">
-              <v-chip color="primary" size="small" variant="tonal">
-                {{ guest.totalPeople }}
+              <v-chip
+                :color="guest.rowType === 'guest' ? 'primary' : 'secondary'"
+                size="small"
+                variant="tonal"
+              >
+                {{ guest.rowType === 'guest' ? 'Convidado' : 'Acompanhante' }}
               </v-chip>
             </td>
+            <td class="pa-4">{{ guest.email || '—' }}</td>
             <td class="pa-4 text-grey-700">
               {{ formatDate(guest.confirmedAt) }}
             </td>
@@ -154,7 +153,7 @@
     return guests.value.filter(
       g =>
         g.fullName.toLowerCase().includes(query)
-        || g.email.toLowerCase().includes(query),
+        || (g.email || '').toLowerCase().includes(query),
     )
   })
 
@@ -206,14 +205,13 @@
   async function downloadCsv () {
     isExporting.value = true
     try {
-      const header = ['#', 'Nome', 'E-mail', 'Acompanhante', 'Total de Pessoas', 'Confirmado em']
+      const header = ['#', 'Nome', 'Tipo', 'E-mail', 'Confirmado em']
       const lines = numberedGuests.value.map(guest => {
         return [
           guest.position,
           guest.fullName,
-          guest.email,
-          guest.companionName || '',
-          guest.totalPeople,
+          guest.rowType === 'guest' ? 'Convidado' : 'Acompanhante',
+          guest.email || '',
           formatDate(guest.confirmedAt),
         ].map(value => escapeCsvValue(value)).join(',')
       })

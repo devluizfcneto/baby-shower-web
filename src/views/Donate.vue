@@ -1,6 +1,13 @@
 <template>
   <section class="donate-page">
-    <div class="donate-page__bg" />
+    <div
+      class="donate-page__bg"
+      :class="{
+        'donate-page__bg--custom': hasCustomCover,
+        'donate-page__bg--default': !hasCustomCover,
+      }"
+      :style="donateBackgroundStyle"
+    />
 
     <v-container class="donate-page__content py-8 py-md-12" max-width="1020">
       <v-sheet class="hero pa-6 pa-md-8 mb-6" rounded="xl">
@@ -50,18 +57,10 @@
 
         <template v-else>
           <v-row class="mb-6" dense>
-            <v-col v-if="dadPixKey || dadPixQr" cols="12" md="6">
+            <v-col v-if="dadPixKey" cols="12" md="6">
               <v-card class="pix-card h-100" rounded="xl" variant="elevated">
                 <v-card-title class="pix-card__title">Pix do papai</v-card-title>
                 <v-card-text>
-                  <v-img
-                    v-if="dadPixQr"
-                    class="pix-card__qr mb-4"
-                    contain
-                    height="210"
-                    :src="dadPixQr"
-                  />
-
                   <p class="pix-card__label">Chave Pix</p>
                   <p class="pix-card__key">{{ dadPixKey || 'Chave Pix indisponivel.' }}</p>
 
@@ -79,18 +78,10 @@
               </v-card>
             </v-col>
 
-            <v-col v-if="momPixKey || momPixQr" cols="12" md="6">
+            <v-col v-if="momPixKey" cols="12" md="6">
               <v-card class="pix-card h-100" rounded="xl" variant="elevated">
                 <v-card-title class="pix-card__title">Pix da mamae</v-card-title>
                 <v-card-text>
-                  <v-img
-                    v-if="momPixQr"
-                    class="pix-card__qr mb-4"
-                    contain
-                    height="210"
-                    :src="momPixQr"
-                  />
-
                   <p class="pix-card__label">Chave Pix</p>
                   <p class="pix-card__key">{{ momPixKey || 'Chave Pix indisponivel.' }}</p>
 
@@ -108,6 +99,16 @@
               </v-card>
             </v-col>
           </v-row>
+
+          <v-sheet v-if="hasPixKey" class="donate-gif pa-3 pa-md-4 mb-6" rounded="xl">
+            <v-img
+              alt="Animacao comemorativa"
+              class="donate-gif__image"
+              contain
+              max-height="340"
+              :src="donationGifUrl"
+            />
+          </v-sheet>
         </template>
       </template>
 
@@ -143,26 +144,21 @@
 
   const resolvedEventCode = computed(() => eventCode.value)
   const toastLocation = computed(() => (smAndDown.value ? 'top' : 'bottom end'))
+  const donationGifUrl = 'https://c.tenor.com/nyndI5kxZsgAAAAC/tenor.gif'
 
   const dadPixKey = computed(() => eventStore.current?.pix.dadKey || '')
   const momPixKey = computed(() => eventStore.current?.pix.momKey || '')
-  const dadPixQr = computed(() => normalizeQrSource(eventStore.current?.pix.dadQrCode || ''))
-  const momPixQr = computed(() => normalizeQrSource(eventStore.current?.pix.momQrCode || ''))
-  const hasPixInfo = computed(() => Boolean(dadPixKey.value || momPixKey.value || dadPixQr.value || momPixQr.value))
+  const coverImageUrl = computed(() => eventStore.current?.coverImageUrl?.trim() || '')
+  const hasCustomCover = computed(() => Boolean(coverImageUrl.value))
+  const hasPixKey = computed(() => Boolean(dadPixKey.value || momPixKey.value))
+  const hasPixInfo = computed(() => Boolean(dadPixKey.value || momPixKey.value))
+  const donateBackgroundStyle = computed(() => {
+    const backgroundUrl = coverImageUrl.value || '/background_mail.jpg'
 
-  function normalizeQrSource (value: string): string {
-    const trimmed = value.trim()
-
-    if (!trimmed) {
-      return ''
+    return {
+      backgroundImage: `url("${backgroundUrl}")`,
     }
-
-    if (trimmed.startsWith('data:') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed
-    }
-
-    return `data:image/png;base64,${trimmed}`
-  }
+  })
 
   function showToast (message: string, color: 'success' | 'error' = 'success'): void {
     toast.visible = false
@@ -236,12 +232,41 @@
   .donate-page__bg {
     position: absolute;
     inset: 0;
-    background-image: url('/background_mail.jpg');
     background-repeat: no-repeat;
+    transition: opacity 220ms ease;
+    pointer-events: none;
+  }
+
+  .donate-page__bg--default {
     background-size: 560px;
     background-position: right -160px top -70px;
     opacity: 0.12;
-    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+
+  .donate-page__bg--custom {
+    background-size: cover;
+    background-position: center center;
+    opacity: 0.22;
+    filter: saturate(0.94) contrast(1.04);
+    mask-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.74) 0%,
+      rgba(0, 0, 0, 0.58) 38%,
+      rgba(0, 0, 0, 0.32) 68%,
+      rgba(0, 0, 0, 0.16) 100%
+    );
+  }
+
+  .donate-gif {
+    border: 1px solid rgba(21, 31, 54, 0.1);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 14px 30px rgba(21, 31, 54, 0.08);
+  }
+
+  .donate-gif__image {
+    width: 100%;
+    border-radius: 12px;
   }
 
   .donate-page__content {
@@ -346,10 +371,15 @@
   }
 
   @media (max-width: 680px) {
-    .donate-page__bg {
+    .donate-page__bg--default {
       background-size: 430px;
       background-position: right -180px top -52px;
       opacity: 0.1;
+    }
+
+    .donate-page__bg--custom {
+      background-position: center top;
+      opacity: 0.2;
     }
   }
 </style>
