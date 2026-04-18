@@ -12,10 +12,12 @@
     <v-container class="gifts-page__content py-8 py-md-12" max-width="1150">
       <v-sheet class="hero pa-6 pa-md-8 mb-6" rounded="xl">
         <p class="hero__eyebrow">LISTA DE PRESENTES</p>
-        <h1 class="hero__title">Escolha um carinho para o bebe</h1>
+        <h1 class="hero__title">Escolha uma lembrança para o neneco</h1>
         <p class="hero__subtitle">
           Todos os presentes aqui foram selecionados com carinho. Escolha o que desejar e, quando finalizar no marketplace,
           confirme sua compra para atualizarmos a lista.
+        </p>
+        <p class="hero__subtitle"> OBS: Caso deseje dar alguma outra lembrança que não está presente na lista, informe aos responsáveis do evento
         </p>
       </v-sheet>
 
@@ -40,6 +42,89 @@
           {{ refreshButtonLabel }}
         </v-btn>
       </div>
+
+      <v-sheet class="filters pa-4 pa-md-5 mb-5" rounded="xl">
+        <div class="filters__head d-flex align-center justify-space-between flex-wrap ga-2 mb-3">
+          <p class="filters__title">Buscar e ordenar presentes</p>
+
+          <v-chip
+            v-if="activeFilterCount > 0"
+            color="secondary"
+            prepend-icon="mdi-filter-variant"
+            size="small"
+            variant="tonal"
+          >
+            {{ activeFilterCount }} filtro(s) ativo(s)
+          </v-chip>
+        </div>
+
+        <v-row dense>
+          <v-col cols="12" md="5">
+            <v-text-field
+              v-model="giftFilters.search"
+              clearable
+              density="comfortable"
+              hide-details
+              label="Buscar por nome, descricao ou marketplace"
+              prepend-inner-icon="mdi-magnify"
+              variant="outlined"
+            />
+          </v-col>
+
+          <v-col cols="12" md="3">
+            <v-select
+              v-model="giftFilters.marketplace"
+              density="comfortable"
+              hide-details
+              item-title="title"
+              item-value="value"
+              :items="marketplaceFilterOptions"
+              label="Marketplace"
+              variant="outlined"
+            />
+          </v-col>
+
+          <v-col cols="12" md="2">
+            <v-select
+              v-model="giftFilters.sortBy"
+              density="comfortable"
+              hide-details
+              item-title="title"
+              item-value="value"
+              :items="sortByOptions"
+              label="Ordenar por"
+              variant="outlined"
+            />
+          </v-col>
+
+          <v-col cols="12" md="2">
+            <v-select
+              v-model="giftFilters.sortDir"
+              density="comfortable"
+              hide-details
+              item-title="title"
+              item-value="value"
+              :items="sortDirOptions"
+              label="Direcao"
+              variant="outlined"
+            />
+          </v-col>
+        </v-row>
+
+        <div class="d-flex align-center justify-space-between flex-wrap ga-2 mt-3">
+          <p class="filters__hint">Por padrao, presentes desbloqueados aparecem primeiro.</p>
+
+          <v-btn
+            :disabled="!hasActiveFilters"
+            prepend-icon="mdi-filter-off-outline"
+            rounded="pill"
+            variant="text"
+            @click="clearGiftFilters"
+          >
+            Limpar filtros
+          </v-btn>
+        </div>
+      </v-sheet>
 
       <v-progress-linear
         v-if="giftStore.isLoading"
@@ -120,9 +205,9 @@
       <v-empty-state
         v-else
         class="empty-state"
-        headline="Lista ainda em preparacao"
+        :headline="hasActiveFilters ? 'Nenhum presente encontrado' : 'Lista ainda em preparacao'"
         icon="mdi-gift-off-outline"
-        text="Em breve novos presentes serao adicionados."
+        :text="hasActiveFilters ? 'Tente ajustar a busca, marketplace ou ordenacao.' : 'Em breve novos presentes serao adicionados.'"
       />
 
       <v-dialog v-model="purchaseDialog" max-width="680">
@@ -136,6 +221,37 @@
               <p class="dialog-product__name">{{ selectedGift.name }}</p>
               <p class="dialog-product__meta">{{ marketplaceLabel(selectedGift.marketplace) }}</p>
               <p class="dialog-product__meta">Restam {{ remainingQuantity(selectedGift) }} unidades disponiveis.</p>
+            </div>
+
+            <div v-if="deliveryAddressOptions.length > 0" class="delivery-panel mb-4">
+              <p class="delivery-panel__title">Enderecos para entrega</p>
+              <p class="delivery-panel__subtitle">Copie o endereco mais conveniente para finalizar no marketplace.</p>
+
+              <div class="delivery-panel__list">
+                <div
+                  v-for="option in deliveryAddressOptions"
+                  :key="option.label"
+                  class="delivery-option"
+                >
+                  <div class="delivery-option__body">
+                    <p class="delivery-option__label">{{ option.label }}</p>
+                    <p class="delivery-option__text">{{ option.address }}</p>
+                  </div>
+
+                  <v-btn
+                    class="delivery-option__copy"
+                    color="primary"
+                    density="comfortable"
+                    prepend-icon="mdi-content-copy"
+                    rounded="pill"
+                    size="small"
+                    variant="tonal"
+                    @click="copyDeliveryAddress(option.address, option.label)"
+                  >
+                    Copiar
+                  </v-btn>
+                </div>
+              </div>
             </div>
 
             <div class="d-flex flex-wrap ga-3 mb-5">
@@ -237,6 +353,7 @@
 </template>
 
 <script setup lang="ts">
+  import type { ListPublicGiftsParams, PublicGiftSortBy } from '@/api/giftApi'
   import type { Gift } from '@/types/gift'
   import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
@@ -260,8 +377,28 @@
   const lastManualRefreshAt = ref(0)
   const nowTimestamp = ref(Date.now())
   const refreshTickInterval = ref<ReturnType<typeof setInterval> | null>(null)
+  const listReloadTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
   const REFRESH_COOLDOWN_MS = 2 * 60 * 1000
+  const SEARCH_DEBOUNCE_MS = 350
+
+  const marketplaceFilterOptions = [
+    { title: 'Todos os marketplaces', value: 'all' },
+    { title: 'Amazon', value: 'amazon' },
+    { title: 'Mercado Livre', value: 'mercadolivre' },
+    { title: 'Shopee', value: 'shopee' },
+  ]
+
+  const sortByOptions = [
+    { title: 'Ordem da lista', value: 'sortOrder' },
+    { title: 'Nome do produto', value: 'name' },
+    { title: 'Quantidade confirmada', value: 'confirmedQuantity' },
+  ]
+
+  const sortDirOptions = [
+    { title: 'Crescente', value: 'asc' },
+    { title: 'Decrescente', value: 'desc' },
+  ]
 
   const toast = reactive({
     visible: false,
@@ -274,6 +411,13 @@
     guestEmail: '',
     quantity: 1,
     notes: '',
+  })
+
+  const giftFilters = reactive({
+    search: '',
+    marketplace: 'all' as 'all' | Gift['marketplace'],
+    sortBy: 'sortOrder' as PublicGiftSortBy,
+    sortDir: 'asc' as 'asc' | 'desc',
   })
 
   const resolvedEventCode = computed(() => eventCode.value)
@@ -292,6 +436,60 @@
     return Math.max(0, REFRESH_COOLDOWN_MS - elapsed)
   })
   const canManualRefresh = computed(() => manualRefreshRemainingMs.value === 0 && !giftStore.isLoading)
+  const deliveryAddressOptions = computed(() => {
+    const source = [
+      { label: 'Endereco principal', value: eventStore.current?.deliveryAddress },
+      { label: 'Endereco secundario', value: eventStore.current?.deliveryAddress2 },
+      { label: 'Endereco reserva', value: eventStore.current?.deliveryAddress3 },
+    ]
+
+    const options: Array<{ label: string, address: string }> = []
+    const usedAddresses = new Set<string>()
+
+    for (const item of source) {
+      const normalized = (item.value || '').trim()
+
+      if (!normalized || usedAddresses.has(normalized)) {
+        continue
+      }
+
+      usedAddresses.add(normalized)
+      options.push({
+        label: item.label,
+        address: normalized,
+      })
+    }
+
+    return options
+  })
+  const activeFilterCount = computed(() => {
+    let count = 0
+
+    if (giftFilters.search.trim()) {
+      count += 1
+    }
+
+    if (giftFilters.marketplace !== 'all') {
+      count += 1
+    }
+
+    if (giftFilters.sortBy !== 'sortOrder') {
+      count += 1
+    }
+
+    if (giftFilters.sortDir !== 'asc') {
+      count += 1
+    }
+
+    return count
+  })
+  const hasActiveFilters = computed(() => activeFilterCount.value > 0)
+  const giftQueryParams = computed<ListPublicGiftsParams>(() => ({
+    search: giftFilters.search.trim() || undefined,
+    marketplace: giftFilters.marketplace === 'all' ? undefined : giftFilters.marketplace,
+    sortBy: giftFilters.sortBy,
+    sortDir: giftFilters.sortDir,
+  }))
   const refreshButtonLabel = computed(() => {
     if (canManualRefresh.value) {
       return 'Atualizar lista'
@@ -404,11 +602,22 @@
       return
     }
 
-    await giftStore.fetchPublicGifts(resolvedEventCode.value)
+    await giftStore.fetchPublicGifts(resolvedEventCode.value, giftQueryParams.value)
 
     if (giftStore.errorMessage) {
       showToast(giftStore.errorMessage, 'error')
     }
+  }
+
+  function scheduleGiftReload (delayMs = 0): void {
+    if (listReloadTimer.value) {
+      clearTimeout(listReloadTimer.value)
+    }
+
+    listReloadTimer.value = setTimeout(() => {
+      listReloadTimer.value = null
+      void loadGifts()
+    }, delayMs)
   }
 
   async function loadEventContext (): Promise<void> {
@@ -431,6 +640,14 @@
     }
 
     await loadGifts()
+  }
+
+  function clearGiftFilters (): void {
+    giftFilters.search = ''
+    giftFilters.marketplace = 'all'
+    giftFilters.sortBy = 'sortOrder'
+    giftFilters.sortDir = 'asc'
+    scheduleGiftReload()
   }
 
   function openPurchaseFlow (gift: Gift): void {
@@ -483,6 +700,20 @@
     }
 
     window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  async function copyDeliveryAddress (address: string, label: string): Promise<void> {
+    if (!address) {
+      showToast('Endereco indisponivel para copia.', 'error')
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(address)
+      showToast(`${label} copiado.`, 'success')
+    } catch {
+      showToast('Nao foi possivel copiar o endereco.', 'error')
+    }
   }
 
   async function submitPurchaseConfirmation (): Promise<void> {
@@ -571,6 +802,10 @@
   })
 
   onBeforeUnmount(() => {
+    if (listReloadTimer.value) {
+      clearTimeout(listReloadTimer.value)
+    }
+
     if (refreshTickInterval.value) {
       clearInterval(refreshTickInterval.value)
     }
@@ -580,6 +815,14 @@
     hydrateManualRefreshState()
     loadEventContext()
     loadGifts()
+  })
+
+  watch(() => giftFilters.search, () => {
+    scheduleGiftReload(SEARCH_DEBOUNCE_MS)
+  })
+
+  watch(() => [giftFilters.marketplace, giftFilters.sortBy, giftFilters.sortDir], () => {
+    scheduleGiftReload()
   })
 </script>
 
@@ -659,6 +902,29 @@
     color: #3b4866;
     font-family: 'Manrope', sans-serif;
     font-size: 0.98rem;
+  }
+
+  .filters {
+    border: 1px solid rgba(21, 31, 54, 0.11);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(240, 245, 249, 0.92));
+    box-shadow: 0 14px 30px rgba(21, 31, 54, 0.08);
+  }
+
+  .filters__title {
+    margin: 0;
+    color: #1a2943;
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.96rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+
+  .filters__hint {
+    margin: 0;
+    color: #4f6287;
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.84rem;
+    font-weight: 500;
   }
 
   .gift-card {
@@ -752,6 +1018,73 @@
     color: #4b5e82;
     font-family: 'Manrope', sans-serif;
     font-size: 0.9rem;
+  }
+
+  .delivery-panel {
+    border-radius: 14px;
+    border: 1px solid rgba(21, 31, 54, 0.09);
+    background: rgba(248, 251, 255, 0.94);
+    padding: 12px;
+  }
+
+  .delivery-panel__title {
+    margin: 0;
+    color: #1a2943;
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.93rem;
+    font-weight: 700;
+  }
+
+  .delivery-panel__subtitle {
+    margin: 4px 0 0;
+    color: #53668b;
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 500;
+  }
+
+  .delivery-panel__list {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .delivery-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(21, 31, 54, 0.1);
+    background: #fff;
+    padding: 10px;
+  }
+
+  .delivery-option__body {
+    min-width: 0;
+  }
+
+  .delivery-option__label {
+    margin: 0;
+    color: #2b3b59;
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .delivery-option__text {
+    margin: 3px 0 0;
+    color: #3f5278;
+    font-family: 'Manrope', sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .delivery-option__copy {
+    flex-shrink: 0;
   }
 
   .empty-state {

@@ -87,19 +87,36 @@
 
           <v-row class="mt-1" dense>
             <v-col cols="12">
-              <p class="details__text">{{ eventDetailText }}</p>
+              <div class="details__content">
+                <template v-for="(block, blockIndex) in eventDetailBlocks" :key="`event-detail-${blockIndex}`">
+                  <h3 v-if="block.type === 'heading'" class="details__heading">
+                    <template v-for="(token, tokenIndex) in block.tokens" :key="`heading-token-${blockIndex}-${tokenIndex}`">
+                      <strong v-if="token.bold">{{ token.text }}</strong>
+                      <span v-else>{{ token.text }}</span>
+                    </template>
+                  </h3>
 
-              <p v-if="deliveryAddress" class="details__text mt-4">
-                Endereco de entrega principal: {{ deliveryAddress }}
-              </p>
+                  <ul v-else-if="block.type === 'list'" class="details__list">
+                    <li
+                      v-for="(item, itemIndex) in block.items"
+                      :key="`detail-item-${blockIndex}-${itemIndex}`"
+                      class="details__list-item"
+                    >
+                      <template v-for="(token, tokenIndex) in item" :key="`item-token-${blockIndex}-${itemIndex}-${tokenIndex}`">
+                        <strong v-if="token.bold">{{ token.text }}</strong>
+                        <span v-else>{{ token.text }}</span>
+                      </template>
+                    </li>
+                  </ul>
 
-              <p v-if="deliveryAddress2" class="details__text mt-2">
-                Endereco de entrega secundario: {{ deliveryAddress2 }}
-              </p>
-
-              <p v-if="deliveryAddress3" class="details__text mt-2">
-                Endereco de entrega reserva: {{ deliveryAddress3 }}
-              </p>
+                  <p v-else class="details__text details__text--paragraph">
+                    <template v-for="(token, tokenIndex) in block.tokens" :key="`paragraph-token-${blockIndex}-${tokenIndex}`">
+                      <strong v-if="token.bold">{{ token.text }}</strong>
+                      <span v-else>{{ token.text }}</span>
+                    </template>
+                  </p>
+                </template>
+              </div>
             </v-col>
           </v-row>
         </v-sheet>
@@ -177,6 +194,24 @@
   import { useEventStore } from '@/stores/useEventStore'
 
   type EventLike = Record<string, unknown>
+  type DetailInlineToken = {
+    text: string
+    bold: boolean
+  }
+
+  type DetailBlock =
+    | {
+      type: 'heading'
+      tokens: DetailInlineToken[]
+    }
+    | {
+      type: 'paragraph'
+      tokens: DetailInlineToken[]
+    }
+    | {
+      type: 'list'
+      items: DetailInlineToken[][]
+    }
 
   const router = useRouter()
   const { eventCode } = useEventCode()
@@ -192,12 +227,10 @@
   const eventDateIso = computed(() => readField(['date', 'event_date']))
   const eventDateLabel = computed(() => formatDate(eventDateIso.value))
   const venueAddress = computed(() => readField(['venueAddress', 'venue_address']))
-  const deliveryAddress = computed(() => readField(['deliveryAddress', 'delivery_address']))
-  const deliveryAddress2 = computed(() => readField(['deliveryAddress2', 'delivery_address2']))
-  const deliveryAddress3 = computed(() => readField(['deliveryAddress3', 'delivery_address3']))
   const mapsLink = computed(() => readField(['mapsLink', 'maps_link']))
   const coverImageUrl = computed(() => readField(['coverImageUrl', 'cover_image_url']))
   const eventDetailText = computed(() => readField(['eventDetail', 'event_detail']) || 'Estamos preparando uma celebracao especial e ficaremos muito felizes com sua presenca. Confirme sua participacao e explore nossa lista de presentes.')
+  const eventDetailBlocks = computed(() => parseEventDetailBlocks(eventDetailText.value))
   const hasCustomCover = computed(() => Boolean(coverImageUrl.value))
   const mapEmbedSrc = computed(() => buildMapEmbedSrc(mapsLink.value))
   const countdownLabel = computed(() => formatCountdown(eventDateIso.value, nowTimestamp.value))
@@ -330,6 +363,139 @@
       dateStyle: 'full',
       timeStyle: 'short',
     }).format(parsed)
+  }
+
+  function parseEventDetailBlocks (value: string): DetailBlock[] {
+    const normalized = value.replace(/\r\n/g, '\n').trim()
+
+    if (!normalized) {
+      return []
+    }
+
+    const blocks: DetailBlock[] = []
+    const paragraphLines: string[] = []
+    const listItems: string[] = []
+    const lines = normalized.split('\n')
+
+    const flushParagraph = () => {
+      if (!paragraphLines.length) {
+        return
+      }
+
+      blocks.push({
+        type: 'paragraph',
+        tokens: parseInlineTokens(paragraphLines.join(' ')),
+      })
+      paragraphLines.length = 0
+    }
+
+    const flushList = () => {
+      if (!listItems.length) {
+        return
+      }
+
+      blocks.push({
+        type: 'list',
+        items: listItems.map(item => parseInlineTokens(item)),
+      })
+      listItems.length = 0
+    }
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim()
+
+      if (!line) {
+        flushParagraph()
+        flushList()
+        continue
+      }
+
+      const markdownHeadingMatch = line.match(/^#{1,3}\s+(.+)$/)
+      if (markdownHeadingMatch) {
+        flushParagraph()
+        flushList()
+        blocks.push({
+          type: 'heading',
+          tokens: parseInlineTokens(markdownHeadingMatch[1].trim()),
+        })
+        continue
+      }
+
+      const listMatch = line.match(/^([-*]|\d+[.)])\s+(.+)$/)
+      if (listMatch) {
+        flushParagraph()
+        listItems.push(listMatch[2].trim())
+        continue
+      }
+
+      if (isHeadingLike(line)) {
+        flushParagraph()
+        flushList()
+        blocks.push({
+          type: 'heading',
+          tokens: parseInlineTokens(line),
+        })
+        continue
+      }
+
+      flushList()
+      paragraphLines.push(line)
+    }
+
+    flushParagraph()
+    flushList()
+
+    return blocks
+  }
+
+  function isHeadingLike (line: string): boolean {
+    return line.length <= 90 && /[?:]$/.test(line)
+  }
+
+  function parseInlineTokens (text: string): DetailInlineToken[] {
+    const tokens: DetailInlineToken[] = []
+    const regex = /\*\*(.+?)\*\*/g
+    let cursor = 0
+
+    for (const match of text.matchAll(regex)) {
+      const matchedText = match[0]
+      const boldText = match[1]
+      const start = match.index ?? -1
+
+      if (start < 0) {
+        continue
+      }
+
+      if (start > cursor) {
+        tokens.push({
+          text: text.slice(cursor, start),
+          bold: false,
+        })
+      }
+
+      tokens.push({
+        text: boldText,
+        bold: true,
+      })
+
+      cursor = start + matchedText.length
+    }
+
+    if (cursor < text.length) {
+      tokens.push({
+        text: text.slice(cursor),
+        bold: false,
+      })
+    }
+
+    if (!tokens.length) {
+      tokens.push({
+        text,
+        bold: false,
+      })
+    }
+
+    return tokens
   }
 
   watch(resolvedEventCode, loadEvent, { immediate: true })
@@ -706,6 +872,40 @@
     font-family: 'Manrope', sans-serif;
     font-size: 1rem;
     line-height: 1.75;
+  }
+
+  .details__content {
+    display: grid;
+    gap: 12px;
+  }
+
+  .details__heading {
+    margin: 2px 0;
+    color: var(--ink);
+    font-family: 'Manrope', sans-serif;
+    font-size: clamp(1.02rem, 2.2vw, 1.18rem);
+    font-weight: 700;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+  }
+
+  .details__list {
+    margin: 0;
+    padding-left: 1.2rem;
+    display: grid;
+    gap: 7px;
+    color: var(--ink-soft);
+  }
+
+  .details__list-item {
+    font-family: 'Manrope', sans-serif;
+    font-size: 1rem;
+    line-height: 1.72;
+  }
+
+  .details__text--paragraph {
+    margin: 0;
+    text-wrap: pretty;
   }
 
   .details__map {

@@ -102,8 +102,10 @@
             auto-grow
             class="mt-2"
             density="comfortable"
+            hint="Dica: use linha em branco para separar paragrafos, ## para titulos, - para listas e **texto** para negrito."
             label="Detalhes do evento"
-            rows="3"
+            persistent-hint
+            rows="6"
             variant="outlined"
           />
 

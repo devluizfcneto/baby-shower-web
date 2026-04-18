@@ -1,5 +1,6 @@
 import type { Gift } from '@/types/gift'
 import { defineStore } from 'pinia'
+import type { ListPublicGiftsParams, PublicGiftSortBy } from '@/api/giftApi'
 import { listPublicGifts } from '@/api/giftApi'
 import { ApiError } from '@/services/http'
 
@@ -9,6 +10,42 @@ interface GiftState {
   errorMessage: string | null
 }
 
+function compareBySortField (a: Gift, b: Gift, sortBy: PublicGiftSortBy, multiplier: 1 | -1): number {
+  if (sortBy === 'name') {
+    return multiplier * a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+  }
+
+  if (sortBy === 'confirmedQuantity') {
+    return multiplier * (a.confirmedQuantity - b.confirmedQuantity)
+  }
+
+  return multiplier * (a.sortOrder - b.sortOrder)
+}
+
+function sortPublicGiftsWithPriority (items: Gift[], options?: ListPublicGiftsParams): Gift[] {
+  const sortBy = options?.sortBy ?? 'sortOrder'
+  const multiplier: 1 | -1 = options?.sortDir === 'desc' ? -1 : 1
+
+  return [...items].sort((a, b) => {
+    const blockedDiff = Number(a.isBlocked) - Number(b.isBlocked)
+    if (blockedDiff !== 0) {
+      return blockedDiff
+    }
+
+    const sortDiff = compareBySortField(a, b, sortBy, multiplier)
+    if (sortDiff !== 0) {
+      return sortDiff
+    }
+
+    const fallbackNameDiff = a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+    if (fallbackNameDiff !== 0) {
+      return fallbackNameDiff
+    }
+
+    return a.id.localeCompare(b.id, 'pt-BR', { sensitivity: 'base' })
+  })
+}
+
 export const useGiftStore = defineStore('gift', {
   state: (): GiftState => ({
     items: [],
@@ -16,24 +53,13 @@ export const useGiftStore = defineStore('gift', {
     errorMessage: null,
   }),
   actions: {
-    async fetchPublicGifts (eventCode: string) {
+    async fetchPublicGifts (eventCode: string, options?: ListPublicGiftsParams) {
       this.isLoading = true
       this.errorMessage = null
 
       try {
-        const gifts = await listPublicGifts(eventCode)
-
-        this.items = gifts.reduce<Gift[]>((ordered, gift) => {
-          const insertAt = ordered.findIndex(item => item.sortOrder > gift.sortOrder)
-
-          if (insertAt === -1) {
-            ordered.push(gift)
-          } else {
-            ordered.splice(insertAt, 0, gift)
-          }
-
-          return ordered
-        }, [])
+        const gifts = await listPublicGifts(eventCode, options)
+        this.items = sortPublicGiftsWithPriority(gifts, options)
       } catch (error) {
         if (error instanceof ApiError) {
           if (error.status === 404) {

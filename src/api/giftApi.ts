@@ -1,6 +1,16 @@
 import type { Gift, GiftPurchaseConfirmationPayload } from '@/types/gift'
 import { apiFetch } from '@/services/http'
 
+export type PublicGiftSortBy = 'sortOrder' | 'name' | 'confirmedQuantity'
+export type PublicGiftSortDir = 'asc' | 'desc'
+
+export interface ListPublicGiftsParams {
+  search?: string
+  marketplace?: Gift['marketplace']
+  sortBy?: PublicGiftSortBy
+  sortDir?: PublicGiftSortDir
+}
+
 type UnknownRecord = Record<string, unknown>
 
 function asRecord (value: unknown): UnknownRecord {
@@ -69,8 +79,15 @@ function normalizeGiftList (payload: unknown): Gift[] {
   return []
 }
 
-export function listPublicGifts (eventCode: string): Promise<Gift[]> {
-  return apiFetch<unknown>(`/events/${eventCode}/gifts`).then(normalizeGiftList)
+export function listPublicGifts (eventCode: string, params?: ListPublicGiftsParams): Promise<Gift[]> {
+  return apiFetch<unknown>(`/events/${eventCode}/gifts`, {
+    params: {
+      search: params?.search,
+      marketplace: params?.marketplace,
+      sortBy: params?.sortBy,
+      sortDir: params?.sortDir,
+    },
+  }).then(normalizeGiftList)
 }
 
 export function confirmGiftPurchase (

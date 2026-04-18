@@ -12,9 +12,9 @@
     <v-container class="donate-page__content py-8 py-md-12" max-width="1020">
       <v-sheet class="hero pa-6 pa-md-8 mb-6" rounded="xl">
         <p class="hero__eyebrow">DOACAO VIA PIX</p>
-        <h1 class="hero__title">Contribua com carinho para este momento especial</h1>
+        <h1 class="hero__title">Se puder contribuir com carinho para a fraldas do Neneco...</h1>
         <p class="hero__subtitle">
-          Escolha uma chave Pix e realize a transferencia direto pelo app do seu banco.
+          Escolha uma chave Pix e faça transferencia direto pelo app do seu banco.
         </p>
 
         <div class="d-flex ga-3 mt-4 flex-wrap">
