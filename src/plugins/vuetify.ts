@@ -13,6 +13,21 @@ import 'vuetify/styles'
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
   theme: {
-    defaultTheme: 'system',
+    defaultTheme: 'babyShowerLight',
+    themes: {
+      babyShowerLight: {
+        dark: false,
+        colors: {
+          background: '#F6F9FB',
+          error: '#B3261E',
+          info: '#1769AA',
+          primary: '#355C8A',
+          secondary: '#DB7742',
+          success: '#2E7D32',
+          surface: '#FFFFFF',
+          warning: '#B26A00',
+        },
+      },
+    },
   },
 })
