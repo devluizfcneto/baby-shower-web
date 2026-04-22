@@ -565,7 +565,7 @@ export function deleteAdminEventGift (eventId: string, giftId: string): Promise<
 }
 
 export async function listAdminEventGuests (eventId: string): Promise<AdminGuestsListResponse> {
-  const payload = await apiFetch<unknown>(`/admin/events/${eventId}/guests`)
+  const payload = await apiFetch<unknown>(`/admin/events/${eventId}/guests?perPage=200`)
   const data = unwrapResponse<unknown>(payload)
 
   if (!Array.isArray(data)) {
