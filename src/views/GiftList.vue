@@ -262,7 +262,7 @@
                 variant="tonal"
                 @click="openMarketplace(selectedGift.marketplaceUrl)"
               >
-                Ir para o marketplace
+                Comprar na loja {{ marketplaceLabel(selectedGift.marketplace) }}
               </v-btn>
             </div>
 
@@ -273,7 +273,7 @@
                     v-model="purchaseForm.guestName"
                     clearable
                     density="comfortable"
-                    label="Seu nome completo"
+                    label="Seu nome"
                     :rules="guestNameRules"
                     variant="outlined"
                   />
@@ -324,7 +324,7 @@
                   rounded="pill"
                   type="submit"
                 >
-                  Confirmar compra
+                  Comprei o presente na loja {{ marketplaceLabel(selectedGift.marketplace) }} 
                 </v-btn>
 
                 <v-btn
