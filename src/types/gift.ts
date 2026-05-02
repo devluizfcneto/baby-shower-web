@@ -14,7 +14,7 @@ export interface Gift {
 
 export interface GiftPurchaseConfirmationPayload {
   guestName: string
-  guestEmail: string
+  guestEmail?: string
   quantity?: number
   notes?: string
 }

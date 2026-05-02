@@ -284,7 +284,7 @@
                     v-model="purchaseForm.guestEmail"
                     clearable
                     density="comfortable"
-                    label="Seu e-mail"
+                    label="Seu e-mail (opcional)"
                     :rules="guestEmailRules"
                     type="email"
                     variant="outlined"
@@ -504,8 +504,10 @@
   ]
 
   const guestEmailRules = [
-    (value: string) => !!value.trim() || 'Informe seu e-mail',
-    (value: string) => /\S+@\S+\.\S+/.test(value) || 'Informe um e-mail valido',
+    (value: string) => {
+      if (!value.trim()) return true
+      return /\S+@\S+\.\S+/.test(value) || 'Informe um e-mail valido'
+    },
   ]
 
   const quantityRules = [
@@ -525,6 +527,20 @@
     setTimeout(() => {
       toast.visible = true
     }, 0)
+  }
+
+  function resolveApiErrorMessage (error: ApiError, fallback: string): string {
+    const details = error.details as { message?: unknown } | undefined
+
+    if (typeof details?.message === 'string' && details.message.trim()) {
+      return details.message.trim()
+    }
+
+    if (error.message && error.message.trim()) {
+      return error.message.trim()
+    }
+
+    return fallback
   }
 
   function formatDuration (durationMs: number): string {
@@ -743,7 +759,7 @@
     try {
       await confirmGiftPurchase(resolvedEventCode.value, selectedGift.value.id, {
         guestName: purchaseForm.guestName.trim(),
-        guestEmail: purchaseForm.guestEmail.trim(),
+        guestEmail: purchaseForm.guestEmail.trim() || undefined,
         quantity: normalizedQuantity,
         notes: purchaseForm.notes.trim() || undefined,
       })
@@ -753,39 +769,16 @@
       closePurchaseDialog()
     } catch (error) {
       if (error instanceof ApiError) {
-        switch (error.status) {
-          case 404: {
-            showToast('Presente ou evento nao encontrado.', 'error')
-            break
-          }
-          case 409: {
-            showToast('Este presente nao esta mais disponivel.', 'error')
-            break
-          }
-          case 410: {
-            showToast('Este evento foi encerrado.', 'error')
-            break
-          }
-          case 422: {
-            showToast('Dados invalidos. Revise os campos.', 'error')
-            break
-          }
-          case 429: {
-            showToast('Muitas tentativas. Aguarde e tente novamente.', 'error')
-            break
-          }
-          default: {
-            if (error.status && error.status >= 500) {
-              showToast('Erro no servidor. Tente novamente.', 'error')
-            } else {
-              showToast('Nao foi possivel confirmar sua compra.', 'error')
-            }
-            break
-          }
+        if (error.status && error.status >= 500) {
+          showToast('Aguarde um instante e tente novamente mais tarde', 'error')
+          return
         }
-      } else {
-        showToast('Falha de conexao. Verifique sua internet.', 'error')
+
+        showToast(resolveApiErrorMessage(error, 'Nao foi possivel confirmar sua compra.'), 'error')
+        return
       }
+
+      showToast('Aguarde um instante e tente novamente mais tarde', 'error')
     } finally {
       isSubmittingPurchase.value = false
     }
